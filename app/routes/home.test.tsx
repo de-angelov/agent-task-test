@@ -5,9 +5,10 @@ import { HomeView, loader } from "./home";
 
 describe("home route", () => {
   it("renders the placeholder frontend", () => {
-    expect(renderToString(<HomeView />)).toContain(
-      "React Router is rendering.",
-    );
+    const html = renderToString(<HomeView />);
+
+    expect(html).toContain("React Router is rendering.");
+    expect(html).toContain("button-primary");
   });
 
   it("loads the placeholder service response", async () => {
