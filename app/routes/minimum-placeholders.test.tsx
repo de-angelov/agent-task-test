@@ -51,9 +51,17 @@ describe("minimum placeholder routes", () => {
 
     expect(board).toContain("Ready for implementation");
     expect(board).toContain("Create ticket");
+    expect(board).toContain("user@example.com");
+    expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
     expect(details).toContain("Viewing ticket TICKET-1");
     expect(edit).toContain("Editing ticket TICKET-1");
+  });
+
+  it("keeps authenticated navigation off public authentication screens", () => {
+    expect(renderToString(<LoginView />)).not.toContain("Log out");
+    expect(renderToString(<SignupView />)).not.toContain("Log out");
+    expect(renderToString(<VerifyEmailView />)).not.toContain("Log out");
   });
 
   it("renders team and epic management placeholders", () => {
