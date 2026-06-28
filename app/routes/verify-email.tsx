@@ -1,7 +1,7 @@
 import { match } from "ts-pattern";
 import { useLoaderData } from "react-router";
 
-import { PlaceholderNotice, ScreenShell } from "./placeholder-ui";
+import { PlaceholderNotice, PublicScreenShell } from "./placeholder-ui";
 
 type VerificationStatus = "success" | "invalid-token" | "expired-token";
 
@@ -40,7 +40,7 @@ export function VerifyEmailView({
     .exhaustive();
 
   return (
-    <ScreenShell title="Email verification">
+    <PublicScreenShell title="Email verification">
       <PlaceholderNotice>{message}</PlaceholderNotice>
       {status !== "success" ? (
         <form action="/resend-verification" className="inline-form" method="post">
@@ -51,7 +51,7 @@ export function VerifyEmailView({
           <button type="submit">Send a new verification email</button>
         </form>
       ) : null}
-    </ScreenShell>
+    </PublicScreenShell>
   );
 }
 

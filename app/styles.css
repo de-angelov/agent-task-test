@@ -49,6 +49,9 @@ body {
 }
 
 .top-links,
+.authenticated-header,
+.authenticated-nav,
+.authenticated-user,
 .toolbar,
 .form-panel,
 .inline-form,
@@ -65,6 +68,9 @@ body {
 }
 
 .top-links,
+.authenticated-header,
+.authenticated-nav,
+.authenticated-user,
 .toolbar,
 .kanban-board {
   flex-wrap: wrap;

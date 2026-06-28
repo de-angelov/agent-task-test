@@ -1,4 +1,8 @@
-import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
+import {
+  PlaceholderForm,
+  PlaceholderNotice,
+  PublicScreenShell,
+} from "./placeholder-ui";
 
 export function meta() {
   return [{ title: "Sign Up" }];
@@ -10,7 +14,7 @@ export async function action() {
 
 export function SignupView() {
   return (
-    <ScreenShell title="Sign up">
+    <PublicScreenShell title="Sign up">
       <PlaceholderNotice>
         Account creation will connect to the authentication service later.
       </PlaceholderNotice>
@@ -22,7 +26,7 @@ export function SignupView() {
         ]}
         title="Create an account"
       />
-    </ScreenShell>
+    </PublicScreenShell>
   );
 }
 

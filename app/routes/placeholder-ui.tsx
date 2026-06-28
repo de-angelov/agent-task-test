@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { AuthenticatedHeader } from "~/components/authenticated-header";
+
 type Field = {
   label: string;
   name: string;
@@ -10,6 +12,7 @@ type Field = {
 type ShellProps = {
   title: string;
   children: ReactNode;
+  userEmail?: string;
 };
 
 type PlaceholderFormProps = {
@@ -19,15 +22,26 @@ type PlaceholderFormProps = {
   children?: ReactNode;
 };
 
-export function ScreenShell({ title, children }: ShellProps) {
+export function ScreenShell({
+  title,
+  children,
+  userEmail = "user@example.com",
+}: ShellProps) {
   return (
     <main className="page">
-      <nav className="top-links" aria-label="Primary">
+      <AuthenticatedHeader userEmail={userEmail} />
+      <h1>{title}</h1>
+      {children}
+    </main>
+  );
+}
+
+export function PublicScreenShell({ title, children }: ShellProps) {
+  return (
+    <main className="page">
+      <nav className="top-links" aria-label="Public">
         <a href="/signup">Sign up</a>
         <a href="/login">Log in</a>
-        <a href="/board">Board</a>
-        <a href="/teams">Teams</a>
-        <a href="/epics">Epics</a>
       </nav>
       <h1>{title}</h1>
       {children}

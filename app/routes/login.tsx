@@ -1,4 +1,8 @@
-import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
+import {
+  PlaceholderForm,
+  PlaceholderNotice,
+  PublicScreenShell,
+} from "./placeholder-ui";
 
 export function meta() {
   return [{ title: "Log In" }];
@@ -10,7 +14,7 @@ export async function action() {
 
 export function LoginView() {
   return (
-    <ScreenShell title="Log in">
+    <PublicScreenShell title="Log in">
       <PlaceholderNotice>
         Authentication is not connected yet. Unverified accounts can request a
         new verification email below.
@@ -30,7 +34,7 @@ export function LoginView() {
         </label>
         <button type="submit">Resend verification email</button>
       </form>
-    </ScreenShell>
+    </PublicScreenShell>
   );
 }
 
