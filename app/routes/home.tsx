@@ -1,4 +1,7 @@
+import { useState } from "react";
+
 import { Button } from "~/components/button";
+import { Dialog } from "~/components/dialog";
 import { getPlaceholderMessage } from "~/services/placeholder.server";
 
 export function meta() {
@@ -22,11 +25,13 @@ export async function loader() {
 }
 
 export function HomeView() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   return (
     <main className="page">
       <h1>Application placeholder</h1>
       <p>React Router is rendering.</p>
-      <Button>Continue</Button>
+      <Button onClick={() => setIsDialogOpen(true)}>Continue</Button>
       <nav className="top-links" aria-label="Placeholder screens">
         <a href="/signup">Sign up</a>
         <a href="/login">Log in</a>
@@ -34,6 +39,21 @@ export function HomeView() {
         <a href="/teams">Teams</a>
         <a href="/epics">Epics</a>
       </nav>
+      <Dialog
+        cancelAction={
+          <Button variant="secondary" onClick={() => setIsDialogOpen(false)}>
+            Cancel
+          </Button>
+        }
+        confirmAction={
+          <Button onClick={() => setIsDialogOpen(false)}>Confirm</Button>
+        }
+        isOpen={isDialogOpen}
+        onCancel={() => setIsDialogOpen(false)}
+        title="Continue from placeholder"
+      >
+        Confirm that you want to continue from the application placeholder.
+      </Dialog>
     </main>
   );
 }
