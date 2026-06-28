@@ -7,7 +7,7 @@
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "test": "vitest run",
+    "test": "react-router typegen && vitest run",
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
