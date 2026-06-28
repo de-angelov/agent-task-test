@@ -9,3 +9,9 @@ This repository is bootstrapped as a minimal React Router framework-mode applica
 - `npm test` runs Vitest.
 - `npm run build` builds the production app.
 - `npm run db:migrate` applies Drizzle migrations.
+
+## Branch cleanup
+
+The `Cleanup merged branches` GitHub Actions workflow runs daily at 00:00 UTC and can also be started manually. It fetches remote branches, deletes branches whose remote tip is already merged into `main`, and skips `main`, configured keep branches, protected branches, and branches that are not merged.
+
+Default keep patterns are `main`, `master`, `develop`, `development`, `staging`, `production`, `release/*`, and `gh-pages`. Manual runs can add more exact names or shell globs with the `keep_branches` input, and can use `dry_run` to list deletion candidates without deleting them.
