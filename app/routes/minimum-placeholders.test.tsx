@@ -35,6 +35,9 @@ describe("minimum placeholder routes", () => {
     expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
       "verification link is invalid",
     );
+    expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
+      "Send a new verification email",
+    );
     expect(renderToString(<VerifyEmailView status="expired-token" />)).toContain(
       "Send a new verification email",
     );

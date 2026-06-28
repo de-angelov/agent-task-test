@@ -42,7 +42,7 @@ export function VerifyEmailView({
   return (
     <ScreenShell title="Email verification">
       <PlaceholderNotice>{message}</PlaceholderNotice>
-      {status === "expired-token" ? (
+      {status !== "success" ? (
         <form action="/resend-verification" className="inline-form" method="post">
           <label className="form-field">
             <span>Email address</span>
