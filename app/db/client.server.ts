@@ -1,8 +1,22 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
 import * as schema from "./schema";
 
-const sqlite = new Database(process.env.DATABASE_URL ?? "local.db");
+export type AppDatabase = BetterSQLite3Database<typeof schema>;
 
-export const db = drizzle(sqlite, { schema });
+export function createSqliteConnection(path = process.env.DATABASE_URL ?? "local.db") {
+  const sqlite = new Database(path);
+  sqlite.pragma("foreign_keys = ON");
+
+  return sqlite;
+}
+
+export function createDatabaseClient(sqlite: Database.Database): AppDatabase {
+  return drizzle(sqlite, { schema });
+}
+
+const sqlite = createSqliteConnection();
+
+export const db = createDatabaseClient(sqlite);
