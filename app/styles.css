@@ -17,6 +17,8 @@ body {
   --button-disabled-background: #eeeeee;
   --button-disabled-color: #555555;
   --button-focus-color: black;
+  --dialog-background: white;
+  --dialog-color: black;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,6 +35,8 @@ body {
     --button-disabled-background: #222222;
     --button-disabled-color: #aaaaaa;
     --button-focus-color: white;
+    --dialog-background: black;
+    --dialog-color: white;
   }
 }
 
@@ -78,4 +82,23 @@ body {
   background: var(--button-disabled-background);
   color: var(--button-disabled-color);
   cursor: not-allowed;
+}
+
+.dialog {
+  background: var(--dialog-background);
+  border: 1px solid grey;
+  color: var(--dialog-color);
+  padding: 10px;
+}
+
+.dialog::backdrop {
+  background: transparent;
+}
+
+.dialog-content,
+.dialog-body,
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
