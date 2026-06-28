@@ -23,6 +23,7 @@ export function Dialog({
   title,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
   const titleId = useId();
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export function Dialog({
     }
 
     if (isOpen && !dialog.open) {
+      previousFocusRef.current = document.activeElement;
       dialog.showModal();
       focusFirstDialogControl(dialog);
       return;
@@ -43,13 +45,26 @@ export function Dialog({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    const previousFocus = previousFocusRef.current;
+
+    if (previousFocus instanceof HTMLElement) {
+      previousFocus.focus();
+    }
+
+    previousFocusRef.current = null;
+  }, [isOpen]);
+
   return (
     <dialog
       aria-labelledby={titleId}
       aria-modal="true"
       className="dialog"
       onCancel={onCancel}
-      open={isOpen || undefined}
       ref={dialogRef}
     >
       <div className="dialog-content">
