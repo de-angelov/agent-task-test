@@ -1,10 +1,14 @@
-import { randomUUID } from "node:crypto";
-
 import { and, count, eq, ne } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { err, ok, type Result } from "neverthrow";
 
 import * as schema from "~/db/schema";
+import { createIdentifier } from "~/lib/identifiers.server";
+import {
+  systemClock,
+  toUtcIsoTimestamp,
+  type Clock,
+} from "~/lib/timestamps.server";
 
 export interface Team {
   id: string;
@@ -22,14 +26,6 @@ export type TeamMutationError =
   | "not-found";
 
 export type AppDb = BetterSQLite3Database<typeof schema>;
-
-interface Clock {
-  now: () => Date;
-}
-
-const systemClock: Clock = {
-  now: () => new Date(),
-};
 
 export function normalizeTeamName(name: string): Result<string, "empty-name"> {
   const trimmedName = name.trim();
@@ -71,9 +67,9 @@ export function createTeam(
     return err("duplicate-name");
   }
 
-  const timestamp = clock.now().toISOString();
+  const timestamp = toUtcIsoTimestamp(clock.now());
   const team: Team = {
-    id: randomUUID(),
+    id: createIdentifier(),
     name: name.value,
     normalizedName,
     createdAt: timestamp,
@@ -126,7 +122,7 @@ export function renameTeam(
     ...team,
     name: name.value,
     normalizedName,
-    updatedAt: clock.now().toISOString(),
+    updatedAt: toUtcIsoTimestamp(clock.now()),
   };
 
   database

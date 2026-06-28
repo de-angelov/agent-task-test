@@ -1,9 +1,13 @@
-import { randomUUID } from "node:crypto";
-
 import { count, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 
 import * as schema from "~/db/schema";
+import { createIdentifier } from "~/lib/identifiers.server";
+import {
+  systemClock,
+  toUtcIsoTimestamp,
+  type Clock,
+} from "~/lib/timestamps.server";
 
 import type { AppDb } from "./teams.server";
 
@@ -22,14 +26,6 @@ export type EpicMutationError =
   | "immutable-team"
   | "not-found"
   | "team-not-found";
-
-interface Clock {
-  now: () => Date;
-}
-
-const systemClock: Clock = {
-  now: () => new Date(),
-};
 
 export function normalizeEpicTitle(title: string): Result<string, "empty-title"> {
   const trimmedTitle = title.trim();
@@ -71,9 +67,9 @@ export function createEpic(
     return err("team-not-found");
   }
 
-  const timestamp = clock.now().toISOString();
+  const timestamp = toUtcIsoTimestamp(clock.now());
   const epic: Epic = {
-    id: randomUUID(),
+    id: createIdentifier(),
     teamId: input.teamId,
     title: title.value,
     description: input.description ?? null,
@@ -120,7 +116,7 @@ export function editEpic(
     ...epic,
     title: title.value,
     description: input.description ?? null,
-    updatedAt: clock.now().toISOString(),
+    updatedAt: toUtcIsoTimestamp(clock.now()),
   };
 
   database
