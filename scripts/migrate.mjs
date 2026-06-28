@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 const databaseUrl = process.env.DATABASE_URL ?? "local.db";
 const sqlite = new Database(databaseUrl);
+sqlite.pragma("foreign_keys = ON");
 const db = drizzle(sqlite);
 
 migrate(db, { migrationsFolder: "drizzle" });
