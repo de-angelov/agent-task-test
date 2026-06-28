@@ -1,8 +1,11 @@
 import { useLoaderData } from "react-router";
 
+import { requireAuthenticatedUser } from "~/services/session.server";
+
 import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
 
 type LoaderArgs = {
+  request: Request;
   params: {
     ticketId?: string;
   };
@@ -12,14 +15,18 @@ export function meta() {
   return [{ title: "Edit Ticket" }];
 }
 
-export async function loader({ params }: LoaderArgs) {
+export async function loader({ request, params }: LoaderArgs) {
+  await requireAuthenticatedUser(request);
+
   return {
     status: "placeholder-ticket-edit",
     ticketId: params.ticketId ?? "placeholder",
   };
 }
 
-export async function action() {
+export async function action({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
   return { status: "placeholder-ticket-update" };
 }
 

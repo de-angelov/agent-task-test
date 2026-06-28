@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { data, redirect, useActionData, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
@@ -25,12 +26,18 @@ type LoaderData = {
   teams: Team[];
   userEmail: string;
 };
+=======
+import { requireAuthenticatedUser } from "~/services/session.server";
+
+import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
+>>>>>>> agent/2/user-accounts-authentication
 
 export function meta() {
   return [{ title: "Teams" }];
 }
 
 export async function loader({ request }: { request: Request }) {
+<<<<<<< HEAD
   const user = requireAuthenticatedUser(request);
 
   if (user.isErr()) {
@@ -41,6 +48,17 @@ export async function loader({ request }: { request: Request }) {
     teams: listTeams(db),
     userEmail: user.value.email,
   } satisfies LoaderData;
+=======
+  await requireAuthenticatedUser(request);
+
+  return { status: "placeholder-teams" };
+}
+
+export async function action({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
+  return { status: "placeholder-team-save" };
+>>>>>>> agent/2/user-accounts-authentication
 }
 
 export async function action({ request }: { request: Request }) {

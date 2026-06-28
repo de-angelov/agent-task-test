@@ -1,10 +1,20 @@
+import { requireAuthenticatedUser } from "~/services/session.server";
+
 import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
 
 export function meta() {
   return [{ title: "Create Ticket" }];
 }
 
-export async function action() {
+export async function loader({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
+  return { status: "placeholder-ticket-create" };
+}
+
+export async function action({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
   return { status: "placeholder-ticket-create" };
 }
 

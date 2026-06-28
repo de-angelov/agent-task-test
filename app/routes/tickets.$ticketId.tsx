@@ -1,8 +1,11 @@
 import { useLoaderData } from "react-router";
 
+import { requireAuthenticatedUser } from "~/services/session.server";
+
 import { PlaceholderNotice, ScreenShell } from "./placeholder-ui";
 
 type LoaderArgs = {
+  request: Request;
   params: {
     ticketId?: string;
   };
@@ -12,7 +15,9 @@ export function meta() {
   return [{ title: "Ticket Details" }];
 }
 
-export async function loader({ params }: LoaderArgs) {
+export async function loader({ request, params }: LoaderArgs) {
+  await requireAuthenticatedUser(request);
+
   return {
     status: "placeholder-ticket-details",
     ticketId: params.ticketId ?? "placeholder",

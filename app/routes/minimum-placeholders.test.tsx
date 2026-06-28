@@ -3,15 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { BoardView, loader as boardLoader } from "./board";
 import { EpicsView } from "./epics";
-import { action as loginAction, LoginView } from "./login";
-import {
-  action as resendVerificationAction,
-} from "./resend-verification";
-import { action as signupAction, SignupView } from "./signup";
-import {
-  TicketDetailsView,
-  loader as ticketDetailsLoader,
-} from "./tickets.$ticketId";
+import { LoginView } from "./login";
+import { SignupView } from "./signup";
+import { TicketDetailsView } from "./tickets.$ticketId";
 import { TicketEditView } from "./tickets.$ticketId.edit";
 import { TicketCreateView } from "./tickets.new";
 import { TeamsView } from "./teams";
@@ -29,15 +23,15 @@ describe("minimum placeholder routes", () => {
   });
 
   it("renders email verification result states", () => {
-    expect(renderToString(<VerifyEmailView status="success" />)).toContain(
-      "Email verified.",
-    );
     expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
       "verification link is invalid",
     );
     expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
       "Send a new verification email",
     );
+    expect(
+      renderToString(<VerifyEmailView status="token-already-used" />),
+    ).toContain("already used");
     expect(renderToString(<VerifyEmailView status="expired-token" />)).toContain(
       "Send a new verification email",
     );
@@ -69,29 +63,17 @@ describe("minimum placeholder routes", () => {
     expect(renderToString(<EpicsView />)).toContain("Create or edit epic");
   });
 
-  it("keeps route loaders and actions as placeholder boundaries", async () => {
-    await expect(signupAction()).resolves.toEqual({
-      status: "placeholder-signup",
-    });
-    await expect(loginAction()).resolves.toEqual({
-      status: "placeholder-login",
-    });
-    await expect(resendVerificationAction()).resolves.toEqual({
-      status: "placeholder-verification-email-resend",
-    });
-    await expect(boardLoader()).resolves.toEqual({
-      status: "placeholder-board",
-    });
-    await expect(
-      ticketDetailsLoader({ params: { ticketId: "TICKET-1" } }),
-    ).resolves.toEqual({
-      status: "placeholder-ticket-details",
-      ticketId: "TICKET-1",
-    });
+  it("keeps public verification route boundary", async () => {
     await expect(
       verifyEmailLoader({
-        request: new Request("http://example.com/verify-email?status=expired-token"),
+        request: new Request("http://example.com/verify-email"),
       }),
-    ).resolves.toEqual({ status: "expired-token" });
+    ).resolves.toEqual({ status: "invalid-token" });
+  });
+
+  it("redirects unauthenticated users away from business routes", async () => {
+    await expect(
+      boardLoader({ request: new Request("http://example.com/board") }),
+    ).rejects.toMatchObject({ status: 302 });
   });
 });

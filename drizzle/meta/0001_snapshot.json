@@ -1,7 +1,11 @@
 {
   "version": "6",
   "dialect": "sqlite",
+<<<<<<< HEAD
   "id": "814c0b36-5eb5-44da-89ed-a75879735123",
+=======
+  "id": "2384c013-4077-4b9e-96fa-33f49dabd05d",
+>>>>>>> agent/2/user-accounts-authentication
   "prevId": "e941de90-edbb-4f6a-b882-f1cdc5d3c2de",
   "tables": {
     "app_metadata": {
@@ -43,8 +47,13 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+<<<<<<< HEAD
     "epics": {
       "name": "epics",
+=======
+    "email_verification_tokens": {
+      "name": "email_verification_tokens",
+>>>>>>> agent/2/user-accounts-authentication
       "columns": {
         "id": {
           "name": "id",
@@ -53,6 +62,7 @@
           "notNull": true,
           "autoincrement": false
         },
+<<<<<<< HEAD
         "team_id": {
           "name": "team_id",
           "type": "text",
@@ -93,18 +103,28 @@
         },
         "name": {
           "name": "name",
+=======
+        "user_id": {
+          "name": "user_id",
+>>>>>>> agent/2/user-accounts-authentication
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
+<<<<<<< HEAD
         "normalized_name": {
           "name": "normalized_name",
+=======
+        "token_hash": {
+          "name": "token_hash",
+>>>>>>> agent/2/user-accounts-authentication
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
+<<<<<<< HEAD
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -115,27 +135,83 @@
         "updated_at": {
           "name": "updated_at",
           "type": "text",
+=======
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "invalidated_at": {
+          "name": "invalidated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+>>>>>>> agent/2/user-accounts-authentication
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         }
       },
       "indexes": {
+<<<<<<< HEAD
         "teams_normalized_name_unique": {
           "name": "teams_normalized_name_unique",
           "columns": [
             "normalized_name"
+=======
+        "email_verification_tokens_token_hash_unique": {
+          "name": "email_verification_tokens_token_hash_unique",
+          "columns": [
+            "token_hash"
+>>>>>>> agent/2/user-accounts-authentication
           ],
           "isUnique": true
         }
       },
+<<<<<<< HEAD
       "foreignKeys": {},
+=======
+      "foreignKeys": {
+        "email_verification_tokens_user_id_users_id_fk": {
+          "name": "email_verification_tokens_user_id_users_id_fk",
+          "tableFrom": "email_verification_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+>>>>>>> agent/2/user-accounts-authentication
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+<<<<<<< HEAD
     "tickets": {
       "name": "tickets",
+=======
+    "sessions": {
+      "name": "sessions",
+>>>>>>> agent/2/user-accounts-authentication
       "columns": {
         "id": {
           "name": "id",
@@ -144,33 +220,125 @@
           "notNull": true,
           "autoincrement": false
         },
+<<<<<<< HEAD
         "team_id": {
           "name": "team_id",
+=======
+        "user_id": {
+          "name": "user_id",
+>>>>>>> agent/2/user-accounts-authentication
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+<<<<<<< HEAD
+=======
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+>>>>>>> agent/2/user-accounts-authentication
         }
       },
       "indexes": {},
       "foreignKeys": {
+<<<<<<< HEAD
         "tickets_team_id_teams_id_fk": {
           "name": "tickets_team_id_teams_id_fk",
           "tableFrom": "tickets",
           "tableTo": "teams",
           "columnsFrom": [
             "team_id"
+=======
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+>>>>>>> agent/2/user-accounts-authentication
           ],
           "columnsTo": [
             "id"
           ],
+<<<<<<< HEAD
           "onDelete": "restrict",
           "onUpdate": "cascade"
+=======
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+>>>>>>> agent/2/user-accounts-authentication
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+<<<<<<< HEAD
+=======
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+>>>>>>> agent/2/user-accounts-authentication
     }
   },
   "views": {},
