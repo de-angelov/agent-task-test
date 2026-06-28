@@ -1,0 +1,38 @@
+{
+  "name": "repo-agent-1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "react-router-serve ./build/server/index.js",
+    "typecheck": "react-router typegen && tsc",
+    "test": "vitest run",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@react-router/node": "^7.6.3",
+    "@react-router/serve": "^7.6.3",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.44.2",
+    "isbot": "^5.1.28",
+    "neverthrow": "^8.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router": "^7.6.3",
+    "remeda": "^2.24.0",
+    "ts-pattern": "^5.7.1"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^7.6.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.34",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  }
+}
