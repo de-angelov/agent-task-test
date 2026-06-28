@@ -1,3 +1,4 @@
+import { Button } from "~/components/button";
 import { getPlaceholderMessage } from "~/services/placeholder.server";
 
 export function meta() {
@@ -25,6 +26,7 @@ export function HomeView() {
     <main className="page">
       <h1>Application placeholder</h1>
       <p>React Router is rendering.</p>
+      <Button>Continue</Button>
     </main>
   );
 }

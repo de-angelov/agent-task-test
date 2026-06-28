@@ -1,5 +1,39 @@
 body {
+  background: var(--page-background);
+  color: var(--page-color);
   margin: 0;
+}
+
+:root {
+  color-scheme: light;
+  --page-background: white;
+  --page-color: black;
+  --button-primary-background: black;
+  --button-primary-color: white;
+  --button-secondary-background: white;
+  --button-secondary-color: black;
+  --button-destructive-background: white;
+  --button-destructive-color: #8b0000;
+  --button-disabled-background: #eeeeee;
+  --button-disabled-color: #555555;
+  --button-focus-color: black;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page-background: black;
+    --page-color: white;
+    --button-primary-background: white;
+    --button-primary-color: black;
+    --button-secondary-background: black;
+    --button-secondary-color: white;
+    --button-destructive-background: black;
+    --button-destructive-color: #ff9b9b;
+    --button-disabled-background: #222222;
+    --button-disabled-color: #aaaaaa;
+    --button-focus-color: white;
+  }
 }
 
 .page {
@@ -8,4 +42,40 @@ body {
   gap: 10px;
   padding: 10px;
   border: 1px solid grey;
+}
+
+.button {
+  border: 1px solid grey;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.button-primary {
+  background: var(--button-primary-background);
+  color: var(--button-primary-color);
+}
+
+.button-secondary {
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-color);
+}
+
+.button-destructive {
+  background: var(--button-destructive-background);
+  color: var(--button-destructive-color);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--button-focus-color);
+  outline-offset: 2px;
+}
+
+.button-loading {
+  cursor: wait;
+}
+
+.button:disabled {
+  background: var(--button-disabled-background);
+  color: var(--button-disabled-color);
+  cursor: not-allowed;
 }
