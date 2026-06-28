@@ -19,6 +19,10 @@ export const epics = sqliteTable("epics", {
   teamId: text("team_id")
     .notNull()
     .references(() => teams.id, { onDelete: "restrict", onUpdate: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });
 
 export const tickets = sqliteTable("tickets", {
@@ -26,4 +30,8 @@ export const tickets = sqliteTable("tickets", {
   teamId: text("team_id")
     .notNull()
     .references(() => teams.id, { onDelete: "restrict", onUpdate: "cascade" }),
+  epicId: text("epic_id").references(() => epics.id, {
+    onDelete: "restrict",
+    onUpdate: "cascade",
+  }),
 });
