@@ -65,7 +65,7 @@ describe("minimum placeholder routes", () => {
   });
 
   it("renders team and epic management placeholders", () => {
-    expect(renderToString(<TeamsView />)).toContain("Create or rename team");
+    expect(renderToString(<TeamsView />)).toContain("Create team");
     expect(renderToString(<EpicsView />)).toContain("Create or edit epic");
   });
 
