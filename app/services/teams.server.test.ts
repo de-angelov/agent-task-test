@@ -34,13 +34,19 @@ beforeEach(() => {
     CREATE TABLE epics (
       id text PRIMARY KEY NOT NULL,
       team_id text NOT NULL,
+      title text NOT NULL,
+      description text,
+      created_at text NOT NULL,
+      updated_at text NOT NULL,
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
     CREATE TABLE tickets (
       id text PRIMARY KEY NOT NULL,
       team_id text NOT NULL,
-      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE
+      epic_id text,
+      FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
   `);
   database = drizzle(sqlite, { schema });
@@ -139,7 +145,17 @@ describe("team service", () => {
     )._unsafeUnwrap();
 
     database.insert(schema.tickets).values({ id: "ticket-1", teamId: ticketTeam.id }).run();
-    database.insert(schema.epics).values({ id: "epic-1", teamId: epicTeam.id }).run();
+    database
+      .insert(schema.epics)
+      .values({
+        id: "epic-1",
+        teamId: epicTeam.id,
+        title: "Launch Plan",
+        description: null,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      })
+      .run();
 
     expect(deleteTeam(database, { id: ticketTeam.id })._unsafeUnwrapErr()).toBe(
       "blocked-by-tickets",
