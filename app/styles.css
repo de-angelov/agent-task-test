@@ -1,16 +1,49 @@
 body {
   margin: 0;
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
 }
 
 .page {
   display: flex;
-  min-height: 100vh;
   flex-direction: column;
-  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid grey;
+}
+
+.top-links,
+.toolbar,
+.form-panel,
+.inline-form,
+.form-field,
+.kanban-board,
+.kanban-column,
+.ticket-card,
+.item-list,
+.details-list {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid grey;
+}
+
+.top-links,
+.toolbar,
+.kanban-board {
+  flex-wrap: wrap;
+}
+
+.form-panel,
+.inline-form,
+.form-field,
+.kanban-column,
+.ticket-card,
+.item-list,
+.details-list {
+  flex-direction: column;
+}
+
+.placeholder-notice,
+.button-link {
   padding: 10px;
   border: 1px solid grey;
 }

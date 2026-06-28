@@ -25,6 +25,13 @@ export function HomeView() {
     <main className="page">
       <h1>Application placeholder</h1>
       <p>React Router is rendering.</p>
+      <nav className="top-links" aria-label="Placeholder screens">
+        <a href="/signup">Sign up</a>
+        <a href="/login">Log in</a>
+        <a href="/board">Board</a>
+        <a href="/teams">Teams</a>
+        <a href="/epics">Epics</a>
+      </nav>
     </main>
   );
 }

@@ -14,6 +14,38 @@ This document is the single source of truth for project work.
 
 ## Ready For Review
 
+### Minimum Screen Placeholders
+
+Owner: Agent 2
+Branch: agent/2/minimum-screen-placeholders
+Status: Ready For Review
+
+Outcome:
+Add placeholder routes and screen shells for the minimum product surface.
+
+Scope:
+- Add a sign-up screen placeholder with form fields and submit affordance.
+- Add an email verification result screen placeholder covering success, invalid-token, and expired-token states.
+- Add a verification-email resend action placeholder for unverified accounts and expired-token cases.
+- Add a login screen placeholder with form fields and submit affordance.
+- Add a Kanban board placeholder with team selector, columns, and placeholder ticket cards.
+- Add ticket create, edit, and details placeholders.
+- Add a team management screen placeholder with list and create/edit affordances.
+- Add an epic management screen placeholder with list and create/edit affordances.
+- Keep route loaders/actions thin and ready for later service integration.
+- Add focused smoke coverage for the placeholder routes where practical.
+
+Progress:
+- Added placeholder routes for authentication, verification, board, tickets, teams, and epics.
+- Added thin placeholder loaders/actions for later service integration.
+- Added focused smoke tests for route rendering and placeholder loader/action boundaries.
+- Verified with `npm test`, `npm run typecheck`, and `npm run build`.
+
+Follow-up:
+- Implement real account creation, verification, authentication, team, epic, ticket, and board workflows.
+
+---
+
 ### Initial Project Setup
 
 Owner: Agent 1
