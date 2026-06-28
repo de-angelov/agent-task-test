@@ -1,0 +1,134 @@
+name: Cleanup merged branches
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List branches that would be deleted without deleting them."
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      keep_branches:
+        description: "Additional exact names or shell globs to keep, separated by commas or new lines."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-merged-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete remote branches merged into main
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_KEEP_BRANCHES: |
+        main
+        master
+        develop
+        development
+        staging
+        production
+        release/*
+        gh-pages
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          EXTRA_KEEP_BRANCHES: ${{ inputs.keep_branches || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*"
+
+          if ! git show-ref --verify --quiet refs/remotes/origin/main; then
+            echo "origin/main was not found; refusing to delete branches."
+            exit 1
+          fi
+
+          branches_json="${RUNNER_TEMP}/branches.json"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/branches?per_page=100" > "${branches_json}"
+
+          keep_patterns="${RUNNER_TEMP}/keep-branches.txt"
+          {
+            printf '%s\n' "${DEFAULT_KEEP_BRANCHES}"
+            printf '%s\n' "${EXTRA_KEEP_BRANCHES}" | tr ',' '\n'
+          } | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed '/^$/d' > "${keep_patterns}"
+
+          should_keep() {
+            local branch="$1"
+            local pattern
+
+            while IFS= read -r pattern; do
+              if [[ "${branch}" == ${pattern} ]]; then
+                return 0
+              fi
+            done < "${keep_patterns}"
+
+            return 1
+          }
+
+          is_protected() {
+            local branch="$1"
+            local protected
+
+            protected="$(jq -r --arg branch "${branch}" '.[] | select(.name == $branch) | .protected' "${branches_json}" | head -n 1)"
+            [[ "${protected}" == "true" ]]
+          }
+
+          candidate_count=0
+          deleted_count=0
+          skipped_count=0
+
+          while IFS= read -r branch; do
+            if [[ "${branch}" == "HEAD" ]]; then
+              continue
+            fi
+
+            remote_ref="origin/${branch}"
+
+            if should_keep "${branch}"; then
+              echo "Keeping ${branch}: configured keep branch."
+              skipped_count=$((skipped_count + 1))
+              continue
+            fi
+
+            if ! git merge-base --is-ancestor "${remote_ref}" origin/main; then
+              echo "Keeping ${branch}: not merged into main."
+              skipped_count=$((skipped_count + 1))
+              continue
+            fi
+
+            if is_protected "${branch}"; then
+              echo "Keeping ${branch}: protected branch."
+              skipped_count=$((skipped_count + 1))
+              continue
+            fi
+
+            if [[ "${DRY_RUN}" == "true" ]]; then
+              echo "Would delete ${branch}: merged into main."
+            else
+              echo "Deleting ${branch}: merged into main."
+              git push origin --delete "${branch}"
+              deleted_count=$((deleted_count + 1))
+            fi
+
+            candidate_count=$((candidate_count + 1))
+          done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin)
+
+          echo "Cleanup complete. Candidates processed: ${candidate_count}; branches deleted: ${deleted_count}; branches skipped: ${skipped_count}."
