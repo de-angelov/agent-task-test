@@ -1,10 +1,20 @@
+import { requireAuthenticatedUser } from "~/services/session.server";
+
 import { PlaceholderForm, PlaceholderNotice, ScreenShell } from "./placeholder-ui";
 
 export function meta() {
   return [{ title: "Epics" }];
 }
 
-export async function action() {
+export async function loader({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
+  return { status: "placeholder-epics" };
+}
+
+export async function action({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
   return { status: "placeholder-epic-save" };
 }
 

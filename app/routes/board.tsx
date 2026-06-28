@@ -1,3 +1,7 @@
+import { useLoaderData } from "react-router";
+
+import { requireAuthenticatedUser } from "~/services/session.server";
+
 import { PlaceholderNotice, ScreenShell } from "./placeholder-ui";
 
 const states = [
@@ -22,13 +26,15 @@ export function meta() {
   return [{ title: "Kanban Board" }];
 }
 
-export async function loader() {
-  return { status: "placeholder-board" };
+export async function loader({ request }: { request: Request }) {
+  const user = await requireAuthenticatedUser(request);
+
+  return { status: "placeholder-board", userEmail: user.email };
 }
 
-export function BoardView() {
+export function BoardView({ userEmail = "user@example.com" }: { userEmail?: string }) {
   return (
-    <ScreenShell title="Kanban board">
+    <ScreenShell title="Kanban board" userEmail={userEmail}>
       <PlaceholderNotice>
         Team selection, filtering, ticket navigation, and drag-and-drop
         persistence will connect to backend services later.
@@ -86,5 +92,7 @@ export function BoardView() {
 }
 
 export default function Board() {
-  return <BoardView />;
+  const data = useLoaderData<typeof loader>();
+
+  return <BoardView userEmail={data.userEmail} />;
 }

@@ -12,8 +12,10 @@ describe("home route", () => {
   });
 
   it("loads the placeholder service response", async () => {
-    const result = await loader();
-
-    expect(result).toEqual({ message: "Server service layer is available." });
+    await expect(
+      loader({ request: new Request("http://example.com/") }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
   });
 });

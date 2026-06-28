@@ -1,10 +1,10 @@
-import { data, redirect, useActionData, useLoaderData } from "react-router";
+import { data, useActionData, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
-import { requireAuthenticatedUser } from "~/services/auth.server";
+import { requireAuthenticatedUser } from "~/services/session.server";
 import {
   createTeam,
   deleteTeam,
@@ -31,24 +31,16 @@ export function meta() {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const user = requireAuthenticatedUser(request);
-
-  if (user.isErr()) {
-    throw redirect("/login");
-  }
+  const user = await requireAuthenticatedUser(request);
 
   return {
     teams: listTeams(db),
-    userEmail: user.value.email,
+    userEmail: user.email,
   } satisfies LoaderData;
 }
 
 export async function action({ request }: { request: Request }) {
-  const user = requireAuthenticatedUser(request);
-
-  if (user.isErr()) {
-    throw redirect("/login");
-  }
+  await requireAuthenticatedUser(request);
 
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");

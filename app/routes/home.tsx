@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
 import { getPlaceholderMessage } from "~/services/placeholder.server";
+import { requireAuthenticatedUser } from "~/services/session.server";
 
 export function meta() {
   return [
@@ -14,7 +15,9 @@ export function meta() {
   ];
 }
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
+  await requireAuthenticatedUser(request);
+
   const message = getPlaceholderMessage();
 
   if (message.isOk()) {
