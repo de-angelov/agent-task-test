@@ -9,6 +9,7 @@ import {
   deleteEpic,
   editEpic,
   listEpics,
+  mapEpicMutationError,
   normalizeEpicTitle,
   type Epic,
 } from "./epics.server";
@@ -190,5 +191,17 @@ describe("epic service", () => {
     expect(deleteEpic(database, { id: "missing" })._unsafeUnwrapErr()).toBe(
       "not-found",
     );
+  });
+
+  it("maps mutation errors to user-facing messages", () => {
+    expect(mapEpicMutationError("empty-title")).toBe("Epic title is required.");
+    expect(mapEpicMutationError("team-not-found")).toBe("Team not found.");
+    expect(mapEpicMutationError("immutable-team")).toBe(
+      "Epics cannot be moved between teams.",
+    );
+    expect(mapEpicMutationError("blocked-by-tickets")).toBe(
+      "Remove the epic from referenced tickets before deleting it.",
+    );
+    expect(mapEpicMutationError("not-found")).toBe("Epic not found.");
   });
 });

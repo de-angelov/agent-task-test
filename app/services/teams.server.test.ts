@@ -8,6 +8,7 @@ import {
   createTeam,
   deleteTeam,
   listTeams,
+  mapTeamMutationError,
   normalizeTeamName,
   normalizeTeamNameForUniqueness,
   renameTeam,
@@ -163,5 +164,19 @@ describe("team service", () => {
     expect(deleteTeam(database, { id: epicTeam.id })._unsafeUnwrapErr()).toBe(
       "blocked-by-epics",
     );
+  });
+
+  it("maps mutation errors to user-facing messages", () => {
+    expect(mapTeamMutationError("empty-name")).toBe("Team name is required.");
+    expect(mapTeamMutationError("duplicate-name")).toBe(
+      "A team with that name already exists.",
+    );
+    expect(mapTeamMutationError("blocked-by-tickets")).toBe(
+      "Delete the team's tickets before deleting the team.",
+    );
+    expect(mapTeamMutationError("blocked-by-epics")).toBe(
+      "Delete the team's epics before deleting the team.",
+    );
+    expect(mapTeamMutationError("not-found")).toBe("Team not found.");
   });
 });
