@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { count, countDistinct, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { match } from "ts-pattern";
 
@@ -23,6 +23,10 @@ export interface Epic {
 
 export interface EpicWithTeam extends Epic {
   teamName: string;
+}
+
+export interface EpicManagementRow extends EpicWithTeam {
+  ticketCount: number;
 }
 
 export type EpicMutationError =
@@ -64,6 +68,26 @@ export function listEpicsWithTeams(database: AppDb): EpicWithTeam[] {
     })
     .from(schema.epics)
     .innerJoin(schema.teams, eq(schema.epics.teamId, schema.teams.id))
+    .orderBy(schema.teams.name, schema.epics.title)
+    .all();
+}
+
+export function listEpicManagementRows(database: AppDb): EpicManagementRow[] {
+  return database
+    .select({
+      id: schema.epics.id,
+      teamId: schema.epics.teamId,
+      teamName: schema.teams.name,
+      title: schema.epics.title,
+      description: schema.epics.description,
+      createdAt: schema.epics.createdAt,
+      updatedAt: schema.epics.updatedAt,
+      ticketCount: countDistinct(schema.tickets.id),
+    })
+    .from(schema.epics)
+    .innerJoin(schema.teams, eq(schema.epics.teamId, schema.teams.id))
+    .leftJoin(schema.tickets, eq(schema.tickets.epicId, schema.epics.id))
+    .groupBy(schema.epics.id)
     .orderBy(schema.teams.name, schema.epics.title)
     .all();
 }

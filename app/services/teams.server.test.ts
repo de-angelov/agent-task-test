@@ -7,6 +7,7 @@ import * as schema from "~/db/schema";
 import {
   createTeam,
   deleteTeam,
+  listTeamManagementRows,
   listTeams,
   mapTeamMutationError,
   normalizeTeamName,
@@ -74,6 +75,62 @@ describe("team service", () => {
         normalizedName: "platform",
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
+      },
+    ]);
+  });
+
+  it("lists management rows with zero and nonzero counts ordered by team name", () => {
+    const emptyTeam = createTeam(
+      database,
+      { name: "Support" },
+      { now: () => now },
+    )._unsafeUnwrap();
+    const activeTeam = createTeam(
+      database,
+      { name: "Platform" },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    database
+      .insert(schema.epics)
+      .values([
+        {
+          id: "epic-1",
+          teamId: activeTeam.id,
+          title: "Launch Plan",
+          description: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+        {
+          id: "epic-2",
+          teamId: activeTeam.id,
+          title: "Reliability",
+          description: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      ])
+      .run();
+    database
+      .insert(schema.tickets)
+      .values([
+        { id: "ticket-1", teamId: activeTeam.id, epicId: "epic-1" },
+        { id: "ticket-2", teamId: activeTeam.id, epicId: "epic-2" },
+        { id: "ticket-3", teamId: activeTeam.id, epicId: null },
+      ])
+      .run();
+
+    expect(listTeamManagementRows(database)).toEqual([
+      {
+        ...activeTeam,
+        epicCount: 2,
+        ticketCount: 3,
+      },
+      {
+        ...emptyTeam,
+        epicCount: 0,
+        ticketCount: 0,
       },
     ]);
   });

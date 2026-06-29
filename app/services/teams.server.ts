@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, countDistinct, eq, ne } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { err, ok, type Result } from "neverthrow";
 import { match } from "ts-pattern";
@@ -17,6 +17,11 @@ export interface Team {
   normalizedName: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TeamManagementRow extends Team {
+  epicCount: number;
+  ticketCount: number;
 }
 
 export type TeamMutationError =
@@ -44,6 +49,25 @@ export function normalizeTeamNameForUniqueness(name: string) {
 
 export function listTeams(database: AppDb): Team[] {
   return database.select().from(schema.teams).orderBy(schema.teams.name).all();
+}
+
+export function listTeamManagementRows(database: AppDb): TeamManagementRow[] {
+  return database
+    .select({
+      id: schema.teams.id,
+      name: schema.teams.name,
+      normalizedName: schema.teams.normalizedName,
+      createdAt: schema.teams.createdAt,
+      updatedAt: schema.teams.updatedAt,
+      epicCount: countDistinct(schema.epics.id),
+      ticketCount: countDistinct(schema.tickets.id),
+    })
+    .from(schema.teams)
+    .leftJoin(schema.epics, eq(schema.epics.teamId, schema.teams.id))
+    .leftJoin(schema.tickets, eq(schema.tickets.teamId, schema.teams.id))
+    .groupBy(schema.teams.id)
+    .orderBy(schema.teams.name)
+    .all();
 }
 
 export function createTeam(
