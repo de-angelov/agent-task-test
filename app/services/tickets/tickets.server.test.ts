@@ -11,8 +11,10 @@ import {
   getTicketById,
   listTicketsForTeam,
   mapTicketCreateError,
+  mapTicketUpdateError,
   normalizeTicketBody,
   normalizeTicketTitle,
+  updateTicket,
 } from "./tickets.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
@@ -424,6 +426,259 @@ describe("ticket service", () => {
     ).toEqual(["Newest", "Middle", "Oldest"]);
   });
 
+  it("updates editable ticket fields and advances modified-at when values change", () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const productEpic = createEpicForTest(product.id, "Discovery");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const updatedAt = new Date("2026-06-30T10:15:00.000Z");
+    const updatedTicket = updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: product.id,
+        epicId: productEpic.id,
+        title: "  Fix workflow  ",
+        body: "  Support direct updates  ",
+        type: "bug",
+        state: "in-progress",
+      },
+      { now: () => updatedAt },
+    )._unsafeUnwrap();
+
+    expect(updatedTicket).toEqual({
+      ...ticket,
+      title: "Fix workflow",
+      body: "Support direct updates",
+      type: "bug",
+      state: "in-progress",
+      teamId: product.id,
+      epicId: productEpic.id,
+      modifiedAt: updatedAt.toISOString(),
+    });
+    expect(getTicketById(database, { id: ticket.id })._unsafeUnwrap()).toEqual({
+      ...updatedTicket,
+      teamName: "Product",
+      epicTitle: "Discovery",
+      createdByEmail: "user@example.com",
+    });
+  });
+
+  it("does not advance modified-at when submitted values match persisted values", () => {
+    const team = createTeamForTest();
+    const epic = createEpicForTest(team.id);
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        epicId: epic.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const updatedTicket = updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: team.id,
+        epicId: epic.id,
+        title: "  Create service  ",
+        body: "  Create a focused backend service  ",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => new Date("2026-06-30T10:30:00.000Z") },
+    )._unsafeUnwrap();
+
+    expect(updatedTicket.modifiedAt).toBe(now.toISOString());
+    expect(database.select().from(schema.tickets).all()).toEqual([ticket]);
+  });
+
+  it("validates update enum values and references", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: team.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "story",
+        state: "backlog",
+      })._unsafeUnwrapErr(),
+    ).toBe("invalid-type");
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: team.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "ready",
+      })._unsafeUnwrapErr(),
+    ).toBe("invalid-state");
+    expect(
+      updateTicket(database, {
+        id: "missing-ticket",
+        teamId: team.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrapErr(),
+    ).toBe("not-found");
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: "missing-team",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrapErr(),
+    ).toBe("team-not-found");
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: team.id,
+        epicId: "missing-epic",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrapErr(),
+    ).toBe("epic-not-found");
+  });
+
+  it("requires the selected update epic to be null or from the updated ticket team", () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const platformEpic = createEpicForTest(platform.id, "Platform Plan");
+    const productEpic = createEpicForTest(product.id, "Product Plan");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        epicId: platformEpic.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: product.id,
+        epicId: platformEpic.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrapErr(),
+    ).toBe("epic-team-mismatch");
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: product.id,
+        epicId: productEpic.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrap(),
+    ).toMatchObject({
+      teamId: product.id,
+      epicId: productEpic.id,
+    });
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: product.id,
+        epicId: null,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrap(),
+    ).toMatchObject({
+      teamId: product.id,
+      epicId: null,
+    });
+  });
+
+  it("allows direct state updates between any valid states", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: team.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "done",
+      })._unsafeUnwrap(),
+    ).toMatchObject({ state: "done" });
+
+    expect(
+      updateTicket(database, {
+        id: ticket.id,
+        teamId: team.id,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      })._unsafeUnwrap(),
+    ).toMatchObject({ state: "backlog" });
+  });
+
   it("maps create errors to user-facing messages", () => {
     expect(mapTicketCreateError("empty-title")).toBe("Ticket title is required.");
     expect(mapTicketCreateError("empty-body")).toBe("Ticket body is required.");
@@ -437,5 +692,18 @@ describe("ticket service", () => {
     expect(mapTicketCreateError("created-by-not-found")).toBe(
       "Ticket creator not found.",
     );
+  });
+
+  it("maps update errors to user-facing messages", () => {
+    expect(mapTicketUpdateError("empty-title")).toBe("Ticket title is required.");
+    expect(mapTicketUpdateError("empty-body")).toBe("Ticket body is required.");
+    expect(mapTicketUpdateError("invalid-type")).toBe("Ticket type is invalid.");
+    expect(mapTicketUpdateError("invalid-state")).toBe("Ticket state is invalid.");
+    expect(mapTicketUpdateError("team-not-found")).toBe("Team not found.");
+    expect(mapTicketUpdateError("epic-not-found")).toBe("Epic not found.");
+    expect(mapTicketUpdateError("epic-team-mismatch")).toBe(
+      "Epic must belong to the ticket team.",
+    );
+    expect(mapTicketUpdateError("not-found")).toBe("Ticket not found.");
   });
 });

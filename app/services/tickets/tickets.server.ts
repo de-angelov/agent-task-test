@@ -49,6 +49,16 @@ export type TicketCreateError =
 
 export type TicketReadError = "not-found";
 
+export type TicketUpdateError =
+  | "empty-body"
+  | "empty-title"
+  | "epic-not-found"
+  | "epic-team-mismatch"
+  | "invalid-state"
+  | "invalid-type"
+  | "not-found"
+  | "team-not-found";
+
 export function normalizeTicketTitle(title: string): Result<string, "empty-title"> {
   const trimmedTitle = title.trim();
 
@@ -229,6 +239,123 @@ export function listTicketsForTeam(
     .all();
 }
 
+export function updateTicket(
+  database: AppDb,
+  input: {
+    id: string;
+    teamId: string;
+    epicId?: string | null;
+    title: string;
+    body: string;
+    type: string;
+    state: string;
+  },
+  clock: Clock = systemClock,
+): Result<Ticket, TicketUpdateError> {
+  const title = normalizeTicketTitle(input.title);
+
+  if (title.isErr()) {
+    return err(title.error);
+  }
+
+  const body = normalizeTicketBody(input.body);
+
+  if (body.isErr()) {
+    return err(body.error);
+  }
+
+  const type = parseTicketType(input.type);
+
+  if (type.isErr()) {
+    return err(type.error);
+  }
+
+  const state = parseTicketState(input.state);
+
+  if (state.isErr()) {
+    return err(state.error);
+  }
+
+  const ticket = database
+    .select()
+    .from(schema.tickets)
+    .where(eq(schema.tickets.id, input.id))
+    .get();
+
+  if (!ticket) {
+    return err("not-found");
+  }
+
+  const team = database
+    .select({ id: schema.teams.id })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, input.teamId))
+    .get();
+
+  if (!team) {
+    return err("team-not-found");
+  }
+
+  const epicId = input.epicId === undefined ? ticket.epicId : input.epicId;
+
+  if (epicId) {
+    const epic = database
+      .select({ id: schema.epics.id, teamId: schema.epics.teamId })
+      .from(schema.epics)
+      .where(eq(schema.epics.id, epicId))
+      .get();
+
+    if (!epic) {
+      return err("epic-not-found");
+    }
+
+    if (epic.teamId !== input.teamId) {
+      return err("epic-team-mismatch");
+    }
+  }
+
+  const hasChanges =
+    ticket.title !== title.value ||
+    ticket.body !== body.value ||
+    ticket.type !== type.value ||
+    ticket.state !== state.value ||
+    ticket.teamId !== input.teamId ||
+    ticket.epicId !== epicId;
+
+  const updatedTicket: Ticket = {
+    ...ticket,
+    title: title.value,
+    body: body.value,
+    type: type.value,
+    state: state.value,
+    teamId: input.teamId,
+    epicId,
+    modifiedAt: hasChanges
+      ? toUtcIsoTimestamp(clock.now())
+      : ticket.modifiedAt,
+  };
+
+  if (!hasChanges) {
+    return ok(updatedTicket);
+  }
+
+  database
+    .update(schema.tickets)
+    .set({
+      title: updatedTicket.title,
+      body: updatedTicket.body,
+      type: updatedTicket.type,
+      state: updatedTicket.state,
+      teamId: updatedTicket.teamId,
+      epicId: updatedTicket.epicId,
+      modifiedAt: updatedTicket.modifiedAt,
+    })
+    .where(eq(schema.tickets.id, input.id))
+    .run();
+
+  return ok(updatedTicket);
+}
+
 export function mapTicketCreateError(error: TicketCreateError) {
   return match(error)
     .with("empty-title", () => "Ticket title is required.")
@@ -239,5 +366,18 @@ export function mapTicketCreateError(error: TicketCreateError) {
     .with("epic-not-found", () => "Epic not found.")
     .with("epic-team-mismatch", () => "Epic must belong to the ticket team.")
     .with("created-by-not-found", () => "Ticket creator not found.")
+    .exhaustive();
+}
+
+export function mapTicketUpdateError(error: TicketUpdateError) {
+  return match(error)
+    .with("empty-title", () => "Ticket title is required.")
+    .with("empty-body", () => "Ticket body is required.")
+    .with("invalid-type", () => "Ticket type is invalid.")
+    .with("invalid-state", () => "Ticket state is invalid.")
+    .with("team-not-found", () => "Team not found.")
+    .with("epic-not-found", () => "Epic not found.")
+    .with("epic-team-mismatch", () => "Epic must belong to the ticket team.")
+    .with("not-found", () => "Ticket not found.")
     .exhaustive();
 }
