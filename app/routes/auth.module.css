@@ -1,0 +1,69 @@
+.screen {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 10px;
+}
+
+.panel {
+  border: 1px solid grey;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  padding: 10px;
+  width: 100%;
+}
+
+.header {
+  border: 1px solid grey;
+  padding: 10px;
+}
+
+.header h1,
+.form h2 {
+  margin: 0;
+}
+
+.notice {
+  border: 1px solid grey;
+  margin: 0;
+  padding: 10px;
+}
+
+.success {
+  color: green;
+}
+
+.error {
+  color: #8b0000;
+}
+
+.neutral {
+  color: inherit;
+}
+
+.form {
+  border: 1px solid grey;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.field {
+  border: 1px solid grey;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.links {
+  border: 1px solid grey;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
