@@ -1,8 +1,8 @@
 import { data, useActionData, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
-import { Button } from "~/components/button";
-import { Table, type TableColumn } from "~/components/table";
+import { Button } from "~/components/button/button";
+import { Table, type TableColumn } from "~/components/table/table";
 import { db } from "~/db/client.server";
 import { requireAuthenticatedUser } from "~/services/session.server";
 import {

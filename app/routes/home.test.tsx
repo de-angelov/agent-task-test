@@ -8,7 +8,7 @@ describe("home route", () => {
     const html = renderToString(<HomeView />);
 
     expect(html).toContain("React Router is rendering.");
-    expect(html).toContain("button-primary");
+    expect(html).toContain("Open dialog");
   });
 
   it("loads the placeholder service response", async () => {

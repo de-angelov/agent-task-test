@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { Button } from "~/components/button";
-import { Dialog } from "~/components/dialog";
+import { Button } from "~/components/button/button";
+import { Dialog } from "~/components/dialog/dialog";
 import { getPlaceholderMessage } from "~/services/placeholder.server";
 import { requireAuthenticatedUser } from "~/services/session.server";
 

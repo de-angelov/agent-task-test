@@ -5,6 +5,8 @@ import {
   useRef,
 } from "react";
 
+import styles from "./dialog.module.css";
+
 interface DialogProps {
   cancelAction: ReactNode;
   children: ReactNode;
@@ -63,14 +65,14 @@ export function Dialog({
     <dialog
       aria-labelledby={titleId}
       aria-modal="true"
-      className="dialog"
+      className={styles.dialog}
       onCancel={onCancel}
       ref={dialogRef}
     >
-      <div className="dialog-content">
+      <div className={styles.content}>
         <h2 id={titleId}>{title}</h2>
-        <div className="dialog-body">{children}</div>
-        <div className="dialog-actions">
+        <div className={styles.body}>{children}</div>
+        <div className={styles.actions}>
           {cancelAction}
           {confirmAction}
         </div>

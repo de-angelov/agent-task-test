@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { AuthenticatedHeader } from "~/components/authenticated-header";
+import { AuthenticatedHeader } from "~/components/authenticated-header/authenticated-header";
 
 type Field = {
   label: string;
