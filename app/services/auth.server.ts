@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { err, ok, type Result } from "neverthrow";
 
-import * as schema from "~/db/schema";
+import * as schema from "../db/schema";
 
 export type AuthDb = BetterSQLite3Database<typeof schema>;
 

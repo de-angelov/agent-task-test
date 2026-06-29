@@ -13,6 +13,8 @@ const applicationTables = [
   "epics",
   "tickets",
   "users",
+  "email_verification_tokens",
+  "sessions",
   "comments",
 ] as const;
 
@@ -60,7 +62,15 @@ describe("fresh database initialization", () => {
         .all() as Array<{ name: string }>;
 
       expect(tables.map((table) => table.name)).toEqual(
-        expect.arrayContaining(["app_metadata", "teams", "epics", "tickets"]),
+        expect.arrayContaining([
+          "app_metadata",
+          "teams",
+          "epics",
+          "tickets",
+          "users",
+          "email_verification_tokens",
+          "sessions",
+        ]),
       );
 
       for (const tableName of applicationTables) {
