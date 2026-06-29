@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 import { match } from "ts-pattern";
 
@@ -31,6 +31,12 @@ export interface Ticket {
   modifiedAt: string;
 }
 
+export interface TicketReadModel extends Ticket {
+  teamName: string;
+  epicTitle: string | null;
+  createdByEmail: string;
+}
+
 export type TicketCreateError =
   | "created-by-not-found"
   | "empty-body"
@@ -40,6 +46,8 @@ export type TicketCreateError =
   | "invalid-state"
   | "invalid-type"
   | "team-not-found";
+
+export type TicketReadError = "not-found";
 
 export function normalizeTicketTitle(title: string): Result<string, "empty-title"> {
   const trimmedTitle = title.trim();
@@ -169,6 +177,56 @@ export function createTicket(
   database.insert(schema.tickets).values(ticket).run();
 
   return ok(ticket);
+}
+
+const ticketReadColumns = {
+  id: schema.tickets.id,
+  title: schema.tickets.title,
+  body: schema.tickets.body,
+  type: schema.tickets.type,
+  state: schema.tickets.state,
+  teamId: schema.tickets.teamId,
+  teamName: schema.teams.name,
+  epicId: schema.tickets.epicId,
+  epicTitle: schema.epics.title,
+  createdBy: schema.tickets.createdBy,
+  createdByEmail: schema.users.email,
+  createdAt: schema.tickets.createdAt,
+  modifiedAt: schema.tickets.modifiedAt,
+};
+
+function selectTicketReadModels(database: AppDb) {
+  return database
+    .select(ticketReadColumns)
+    .from(schema.tickets)
+    .innerJoin(schema.teams, eq(schema.teams.id, schema.tickets.teamId))
+    .leftJoin(schema.epics, eq(schema.epics.id, schema.tickets.epicId))
+    .innerJoin(schema.users, eq(schema.users.id, schema.tickets.createdBy));
+}
+
+export function getTicketById(
+  database: AppDb,
+  input: { id: string },
+): Result<TicketReadModel, TicketReadError> {
+  const ticket = selectTicketReadModels(database)
+    .where(eq(schema.tickets.id, input.id))
+    .get();
+
+  if (!ticket) {
+    return err("not-found");
+  }
+
+  return ok(ticket);
+}
+
+export function listTicketsForTeam(
+  database: AppDb,
+  input: { teamId: string },
+): TicketReadModel[] {
+  return selectTicketReadModels(database)
+    .where(eq(schema.tickets.teamId, input.teamId))
+    .orderBy(desc(schema.tickets.modifiedAt))
+    .all();
 }
 
 export function mapTicketCreateError(error: TicketCreateError) {
