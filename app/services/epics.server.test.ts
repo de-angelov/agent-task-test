@@ -8,6 +8,7 @@ import {
   createEpic,
   deleteEpic,
   editEpic,
+  listEpicManagementRows,
   listEpics,
   mapEpicMutationError,
   normalizeEpicTitle,
@@ -115,6 +116,65 @@ describe("epic service", () => {
       updatedAt: now.toISOString(),
     });
     expect(listEpics(database, { teamId: platform.id })).toEqual([platformEpic]);
+  });
+
+  it("lists management rows with ticket counts ordered by team and epic title", () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const migration = createEpic(
+      database,
+      {
+        teamId: platform.id,
+        title: "Migration",
+        description: null,
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+    const launch = createEpic(
+      database,
+      {
+        teamId: platform.id,
+        title: "Launch",
+        description: "Coordinate the MVP launch",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+    const discovery = createEpic(
+      database,
+      {
+        teamId: product.id,
+        title: "Discovery",
+        description: null,
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    database
+      .insert(schema.tickets)
+      .values([
+        { id: "ticket-1", teamId: platform.id, epicId: migration.id },
+        { id: "ticket-2", teamId: platform.id, epicId: migration.id },
+        { id: "ticket-3", teamId: platform.id, epicId: null },
+      ])
+      .run();
+
+    expect(listEpicManagementRows(database)).toEqual([
+      {
+        ...launch,
+        teamName: "Platform",
+        ticketCount: 0,
+      },
+      {
+        ...migration,
+        teamName: "Platform",
+        ticketCount: 2,
+      },
+      {
+        ...discovery,
+        teamName: "Product",
+        ticketCount: 0,
+      },
+    ]);
   });
 
   it("rejects epics for missing teams", () => {
