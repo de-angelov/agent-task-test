@@ -1,5 +1,6 @@
 import { count, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
+import { match } from "ts-pattern";
 
 import * as schema from "~/db/schema";
 import { createIdentifier } from "~/lib/identifiers.server";
@@ -162,16 +163,14 @@ export function deleteEpic(
 }
 
 export function mapEpicMutationError(error: EpicMutationError) {
-  switch (error) {
-    case "empty-title":
-      return "Epic title is required.";
-    case "team-not-found":
-      return "Team not found.";
-    case "immutable-team":
-      return "Epics cannot be moved between teams.";
-    case "blocked-by-tickets":
-      return "Remove the epic from referenced tickets before deleting it.";
-    case "not-found":
-      return "Epic not found.";
-  }
+  return match(error)
+    .with("empty-title", () => "Epic title is required.")
+    .with("team-not-found", () => "Team not found.")
+    .with("immutable-team", () => "Epics cannot be moved between teams.")
+    .with(
+      "blocked-by-tickets",
+      () => "Remove the epic from referenced tickets before deleting it.",
+    )
+    .with("not-found", () => "Epic not found.")
+    .exhaustive();
 }

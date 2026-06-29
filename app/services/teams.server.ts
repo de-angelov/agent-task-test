@@ -1,6 +1,7 @@
 import { and, count, eq, ne } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { err, ok, type Result } from "neverthrow";
+import { match } from "ts-pattern";
 
 import * as schema from "~/db/schema";
 import { createIdentifier } from "~/lib/identifiers.server";
@@ -178,16 +179,17 @@ export function deleteTeam(
 }
 
 export function mapTeamMutationError(error: TeamMutationError) {
-  switch (error) {
-    case "empty-name":
-      return "Team name is required.";
-    case "duplicate-name":
-      return "A team with that name already exists.";
-    case "blocked-by-tickets":
-      return "Delete the team's tickets before deleting the team.";
-    case "blocked-by-epics":
-      return "Delete the team's epics before deleting the team.";
-    case "not-found":
-      return "Team not found.";
-  }
+  return match(error)
+    .with("empty-name", () => "Team name is required.")
+    .with("duplicate-name", () => "A team with that name already exists.")
+    .with(
+      "blocked-by-tickets",
+      () => "Delete the team's tickets before deleting the team.",
+    )
+    .with(
+      "blocked-by-epics",
+      () => "Delete the team's epics before deleting the team.",
+    )
+    .with("not-found", () => "Team not found.")
+    .exhaustive();
 }
