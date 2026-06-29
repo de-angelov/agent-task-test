@@ -67,6 +67,18 @@ export const emailVerificationTokens = sqliteTable("email_verification_tokens", 
   createdAt: integer("created_at").notNull(),
 });
 
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+  invalidatedAt: integer("invalidated_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id")

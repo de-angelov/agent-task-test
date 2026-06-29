@@ -42,6 +42,14 @@ export function createSmtpEmailSender(config = readSmtpConfig()): EmailSender {
         text: `Verify your email address: ${verificationUrl}`,
       });
     },
+    async sendPasswordResetEmail({ email, resetUrl }) {
+      await transporter.sendMail({
+        from: config.from,
+        to: email,
+        subject: "Reset your password",
+        text: `Reset your password: ${resetUrl}`,
+      });
+    },
   };
 }
 
