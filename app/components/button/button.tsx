@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
+import styles from "./button.module.css";
+
 type ButtonVariant = "primary" | "secondary" | "destructive";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -19,9 +21,9 @@ export function Button({
   ...buttonProps
 }: ButtonProps) {
   const buttonClassName = [
-    "button",
-    `button-${variant}`,
-    isLoading ? "button-loading" : undefined,
+    styles.button,
+    styles[variant],
+    isLoading ? styles.loading : undefined,
     className,
   ]
     .filter(Boolean)

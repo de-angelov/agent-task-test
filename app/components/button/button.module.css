@@ -1,0 +1,61 @@
+.button {
+  border: 1px solid grey;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.primary {
+  background: black;
+  color: white;
+}
+
+.secondary {
+  background: white;
+  color: black;
+}
+
+.destructive {
+  background: white;
+  color: #8b0000;
+}
+
+.button:focus-visible {
+  outline: 2px solid black;
+  outline-offset: 2px;
+}
+
+.loading {
+  cursor: wait;
+}
+
+.button:disabled {
+  background: #eeeeee;
+  color: #555555;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .primary {
+    background: white;
+    color: black;
+  }
+
+  .secondary {
+    background: black;
+    color: white;
+  }
+
+  .destructive {
+    background: black;
+    color: #ff9b9b;
+  }
+
+  .button:focus-visible {
+    outline-color: white;
+  }
+
+  .button:disabled {
+    background: #222222;
+    color: #aaaaaa;
+  }
+}

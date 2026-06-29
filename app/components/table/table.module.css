@@ -1,0 +1,16 @@
+.container {
+  display: flex;
+  padding: 10px;
+  border: 1px solid grey;
+}
+
+.table,
+.table th,
+.table td {
+  border: 1px solid grey;
+  padding: 10px;
+}
+
+.state {
+  text-align: left;
+}
