@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BoardView, loader as boardLoader } from "./board";
 import { EpicsView } from "./epics";
 import { LoginView } from "./login";
+import { ResendVerificationView } from "./resend-verification";
 import { SignupView } from "./signup";
 import { TicketDetailsView } from "./tickets.$ticketId";
 import { TicketEditView } from "./tickets.$ticketId.edit";
@@ -15,16 +16,29 @@ describe("minimum placeholder routes", () => {
   it("renders authentication placeholders", () => {
     const signup = renderToString(<SignupView />);
     const login = renderToString(<LoginView />);
+    const resend = renderToString(<ResendVerificationView />);
 
     expect(signup).toContain("Create account");
     expect(signup).toContain("Email address");
+    expect(signup).toContain('href="/login"');
     expect(login).toContain("Log in");
+    expect(login).toContain('href="/signup"');
+    expect(login).toContain('href="/resend-verification"');
     expect(login).toContain("Resend verification email");
+    expect(resend).toContain("Send verification email");
+    expect(resend).toContain('href="/login"');
+    expect(resend).toContain('href="/signup"');
   });
 
   it("renders email verification result states", () => {
+    expect(renderToString(<LoginView verified />)).toContain(
+      "Email verified. You can now log in.",
+    );
     expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
       "verification link is invalid",
+    );
+    expect(renderToString(<VerifyEmailView status="expired-token" />)).toContain(
+      "verification link has expired",
     );
     expect(renderToString(<VerifyEmailView status="invalid-token" />)).toContain(
       "Send a new verification email",
@@ -33,7 +47,7 @@ describe("minimum placeholder routes", () => {
       renderToString(<VerifyEmailView status="token-already-used" />),
     ).toContain("already used");
     expect(renderToString(<VerifyEmailView status="expired-token" />)).toContain(
-      "Send a new verification email",
+      'href="/resend-verification"',
     );
   });
 
@@ -55,6 +69,7 @@ describe("minimum placeholder routes", () => {
   it("keeps authenticated navigation off public authentication screens", () => {
     expect(renderToString(<LoginView />)).not.toContain("Log out");
     expect(renderToString(<SignupView />)).not.toContain("Log out");
+    expect(renderToString(<ResendVerificationView />)).not.toContain("Log out");
     expect(renderToString(<VerifyEmailView />)).not.toContain("Log out");
   });
 

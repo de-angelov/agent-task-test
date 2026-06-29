@@ -5,10 +5,11 @@ import { createLoginSession } from "~/services/auth.server";
 import { createSessionCookie } from "~/services/session.server";
 
 import {
-  PlaceholderForm,
-  PlaceholderNotice,
-  PublicScreenShell,
-} from "./placeholder-ui";
+  AuthField,
+  AuthForm,
+  AuthNotice,
+  AuthPanel,
+} from "./auth-ui";
 
 type ActionArgs = {
   request: Request;
@@ -59,33 +60,32 @@ export function LoginView({
   verified?: boolean;
 }) {
   return (
-    <PublicScreenShell title="Log in">
+    <AuthPanel
+      footer={
+        <>
+          <a href="/signup">Create an account</a>
+          <a href="/resend-verification">Resend verification email</a>
+        </>
+      }
+      title="Log in"
+    >
       {verified ? (
-        <PlaceholderNotice>Email verified. You can now log in.</PlaceholderNotice>
+        <AuthNotice tone="success">
+          Email verified. You can now log in.
+        </AuthNotice>
       ) : null}
-      <PlaceholderNotice>
+      <AuthNotice>
         Use your verified local account. Unverified accounts can request a new
-        verification email below.
-      </PlaceholderNotice>
+        verification email.
+      </AuthNotice>
       {actionData?.status === "error" ? (
-        <PlaceholderNotice>{actionData.error}</PlaceholderNotice>
+        <AuthNotice tone="error">{actionData.error}</AuthNotice>
       ) : null}
-      <PlaceholderForm
-        actionLabel="Log in"
-        fields={[
-          { label: "Email address", name: "email", type: "email" },
-          { label: "Password", name: "password", type: "password" },
-        ]}
-        title="Use local credentials"
-      />
-      <form action="/resend-verification" className="inline-form" method="post">
-        <label className="form-field">
-          <span>Email address</span>
-          <input name="email" type="email" />
-        </label>
-        <button type="submit">Resend verification email</button>
-      </form>
-    </PublicScreenShell>
+      <AuthForm actionLabel="Log in" title="Use local credentials">
+        <AuthField label="Email address" name="email" type="email" />
+        <AuthField label="Password" name="password" type="password" />
+      </AuthForm>
+    </AuthPanel>
   );
 }
 

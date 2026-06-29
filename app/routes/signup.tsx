@@ -5,10 +5,11 @@ import { createUserAccount } from "~/services/auth.server";
 import { createSmtpEmailSender, getAppBaseUrl } from "~/services/email.server";
 
 import {
-  PlaceholderForm,
-  PlaceholderNotice,
-  PublicScreenShell,
-} from "./placeholder-ui";
+  AuthField,
+  AuthForm,
+  AuthNotice,
+  AuthPanel,
+} from "./auth-ui";
 
 type ActionArgs = {
   request: Request;
@@ -45,28 +46,32 @@ export function SignupView({
   actionData?: Awaited<ReturnType<typeof action>>;
 }) {
   return (
-    <PublicScreenShell title="Sign up">
-      <PlaceholderNotice>
+    <AuthPanel
+      footer={
+        <>
+          <a href="/login">Log in to an existing account</a>
+          <a href="/resend-verification">Resend verification email</a>
+        </>
+      }
+      title="Sign up"
+    >
+      <AuthNotice>
         Create an account and verify your email address before using the
         application.
-      </PlaceholderNotice>
+      </AuthNotice>
       {actionData?.status === "verification-sent" ? (
-        <PlaceholderNotice>
+        <AuthNotice tone="success">
           Verification email sent to {actionData.email}.
-        </PlaceholderNotice>
+        </AuthNotice>
       ) : null}
       {actionData?.status === "error" ? (
-        <PlaceholderNotice>{actionData.error}</PlaceholderNotice>
+        <AuthNotice tone="error">{actionData.error}</AuthNotice>
       ) : null}
-      <PlaceholderForm
-        actionLabel="Create account"
-        fields={[
-          { label: "Email address", name: "email", type: "email" },
-          { label: "Password", name: "password", type: "password" },
-        ]}
-        title="Create an account"
-      />
-    </PublicScreenShell>
+      <AuthForm actionLabel="Create account" title="Create an account">
+        <AuthField label="Email address" name="email" type="email" />
+        <AuthField label="Password" name="password" type="password" />
+      </AuthForm>
+    </AuthPanel>
   );
 }
 
