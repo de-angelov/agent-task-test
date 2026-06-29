@@ -16,6 +16,10 @@ export interface Epic {
   updatedAt: string;
 }
 
+export interface EpicWithTeam extends Epic {
+  teamName: string;
+}
+
 export type EpicMutationError =
   | "blocked-by-tickets"
   | "empty-title"
@@ -47,6 +51,23 @@ export function listEpics(database: AppDb, input: { teamId: string }): Epic[] {
     .from(schema.epics)
     .where(eq(schema.epics.teamId, input.teamId))
     .orderBy(schema.epics.title)
+    .all();
+}
+
+export function listEpicsWithTeams(database: AppDb): EpicWithTeam[] {
+  return database
+    .select({
+      id: schema.epics.id,
+      teamId: schema.epics.teamId,
+      teamName: schema.teams.name,
+      title: schema.epics.title,
+      description: schema.epics.description,
+      createdAt: schema.epics.createdAt,
+      updatedAt: schema.epics.updatedAt,
+    })
+    .from(schema.epics)
+    .innerJoin(schema.teams, eq(schema.epics.teamId, schema.teams.id))
+    .orderBy(schema.teams.name, schema.epics.title)
     .all();
 }
 
