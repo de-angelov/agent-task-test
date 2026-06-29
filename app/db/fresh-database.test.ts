@@ -14,6 +14,7 @@ const applicationTables = [
   "tickets",
   "users",
   "email_verification_tokens",
+  "password_reset_tokens",
   "sessions",
   "comments",
 ] as const;
@@ -69,6 +70,7 @@ describe("fresh database initialization", () => {
           "tickets",
           "users",
           "email_verification_tokens",
+          "password_reset_tokens",
           "sessions",
         ]),
       );

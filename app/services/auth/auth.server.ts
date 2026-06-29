@@ -14,6 +14,10 @@ export type EmailSender = {
     email: string;
     verificationUrl: string;
   }): Promise<void>;
+  sendPasswordResetEmail(input: {
+    email: string;
+    resetUrl: string;
+  }): Promise<void>;
 };
 
 export type SignupError =

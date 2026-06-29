@@ -58,6 +58,9 @@ function createEmailSender(): EmailSender & { urls: string[] } {
     async sendVerificationEmail({ verificationUrl }) {
       urls.push(verificationUrl);
     },
+    async sendPasswordResetEmail() {
+      throw new Error("Password reset email is not expected in auth tests.");
+    },
   };
 }
 
