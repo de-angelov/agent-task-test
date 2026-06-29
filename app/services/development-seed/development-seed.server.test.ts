@@ -10,7 +10,7 @@ import {
   hashPassword,
   verifyPassword,
   type AuthDb,
-} from "./auth.server";
+} from "../auth/auth.server";
 import {
   developmentSeedUser,
   seedDevelopmentUser,

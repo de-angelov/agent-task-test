@@ -2,16 +2,16 @@ import { index, route } from "@react-router/dev/routes";
 import type { RouteConfig } from "@react-router/dev/routes";
 
 export default [
-  index("routes/home.tsx"),
-  route("signup", "routes/signup.tsx"),
-  route("login", "routes/login.tsx"),
-  route("logout", "routes/logout.tsx"),
-  route("verify-email", "routes/verify-email.tsx"),
-  route("resend-verification", "routes/resend-verification.tsx"),
-  route("board", "routes/board.tsx"),
-  route("tickets/new", "routes/tickets.new.tsx"),
-  route("tickets/:ticketId", "routes/tickets.$ticketId.tsx"),
-  route("tickets/:ticketId/edit", "routes/tickets.$ticketId.edit.tsx"),
-  route("teams", "routes/teams.tsx"),
-  route("epics", "routes/epics.tsx"),
+  index("routes/home/home.tsx"),
+  route("signup", "routes/auth/signup.tsx"),
+  route("login", "routes/auth/login.tsx"),
+  route("logout", "routes/auth/logout.tsx"),
+  route("verify-email", "routes/auth/verify-email.tsx"),
+  route("resend-verification", "routes/auth/resend-verification.tsx"),
+  route("board", "routes/board/board.tsx"),
+  route("tickets/new", "routes/tickets/new.tsx"),
+  route("tickets/:ticketId", "routes/tickets/details.tsx"),
+  route("tickets/:ticketId/edit", "routes/tickets/edit.tsx"),
+  route("teams", "routes/teams/teams.tsx"),
+  route("epics", "routes/epics/epics.tsx"),
 ] satisfies RouteConfig;

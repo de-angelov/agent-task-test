@@ -4,7 +4,7 @@ import { match } from "ts-pattern";
 import { Button } from "~/components/button";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
-import { requireAuthenticatedUser } from "~/services/session.server";
+import { requireAuthenticatedUser } from "~/services/session/session.server";
 import {
   createTeam,
   deleteTeam,
@@ -12,9 +12,9 @@ import {
   mapTeamMutationError,
   renameTeam,
   type TeamManagementRow,
-} from "~/services/teams.server";
+} from "~/services/teams/teams.server";
 
-import { ScreenShell } from "./placeholder-ui";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type ActionData = {
   message: string;

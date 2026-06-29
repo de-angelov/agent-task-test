@@ -14,7 +14,7 @@ import {
   normalizeEpicTitle,
   type Epic,
 } from "./epics.server";
-import { createTeam, type AppDb } from "./teams.server";
+import { createTeam, type AppDb } from "../teams/teams.server";
 
 const now = new Date("2026-06-28T10:00:00.000Z");
 const later = new Date("2026-06-28T11:00:00.000Z");

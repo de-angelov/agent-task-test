@@ -1,8 +1,8 @@
 import { redirect, useActionData, useLoaderData } from "react-router";
 
 import { db } from "~/db/client.server";
-import { createLoginSession } from "~/services/auth.server";
-import { createSessionCookie } from "~/services/session.server";
+import { createLoginSession } from "~/services/auth/auth.server";
+import { createSessionCookie } from "~/services/session/session.server";
 
 import {
   AuthField,

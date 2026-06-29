@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 
-import type { EmailSender } from "./auth.server";
+import type { EmailSender } from "../auth/auth.server";
 
 type SmtpConfig = {
   host: string;

@@ -4,8 +4,8 @@ import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "~/db/schema";
-import { createEpic } from "~/services/epics.server";
-import { createTeam, type AppDb } from "~/services/teams.server";
+import { createEpic } from "~/services/epics/epics.server";
+import { createTeam, type AppDb } from "~/services/teams/teams.server";
 
 import { handleEpicAction } from "./epics-action.server";
 import { action, EpicsView, loader } from "./epics";

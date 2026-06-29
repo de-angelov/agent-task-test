@@ -6,7 +6,7 @@ import {
   deleteSession,
   findAuthenticatedUser,
   type AuthDb,
-} from "./auth.server";
+} from "../auth/auth.server";
 
 const sessionCookie = createCookie("project_tracker_session", {
   httpOnly: true,

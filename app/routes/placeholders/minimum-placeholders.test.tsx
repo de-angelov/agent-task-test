@@ -1,16 +1,16 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { BoardView, loader as boardLoader } from "./board";
-import { EpicsView } from "./epics";
-import { LoginView } from "./login";
-import { ResendVerificationView } from "./resend-verification";
-import { SignupView } from "./signup";
-import { TicketDetailsView } from "./tickets.$ticketId";
-import { TicketEditView } from "./tickets.$ticketId.edit";
-import { TicketCreateView } from "./tickets.new";
-import { TeamsView } from "./teams";
-import { loader as verifyEmailLoader, VerifyEmailView } from "./verify-email";
+import { LoginView } from "../auth/login";
+import { ResendVerificationView } from "../auth/resend-verification";
+import { SignupView } from "../auth/signup";
+import { loader as verifyEmailLoader, VerifyEmailView } from "../auth/verify-email";
+import { BoardView, loader as boardLoader } from "../board/board";
+import { EpicsView } from "../epics/epics";
+import { TeamsView } from "../teams/teams";
+import { TicketDetailsView } from "../tickets/details";
+import { TicketEditView } from "../tickets/edit";
+import { TicketCreateView } from "../tickets/new";
 
 describe("minimum placeholder routes", () => {
   it("renders authentication placeholders", () => {

@@ -6,8 +6,8 @@ import {
   deleteEpic,
   editEpic,
   mapEpicMutationError,
-} from "~/services/epics.server";
-import type { AppDb } from "~/services/teams.server";
+} from "~/services/epics/epics.server";
+import type { AppDb } from "~/services/teams/teams.server";
 
 type ActionData = {
   message: string;

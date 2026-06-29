@@ -1,8 +1,8 @@
 import { useActionData } from "react-router";
 
 import { db } from "~/db/client.server";
-import { createUserAccount } from "~/services/auth.server";
-import { createSmtpEmailSender, getAppBaseUrl } from "~/services/email.server";
+import { createUserAccount } from "~/services/auth/auth.server";
+import { createSmtpEmailSender, getAppBaseUrl } from "~/services/email/email.server";
 
 import {
   AuthField,
