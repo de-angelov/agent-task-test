@@ -1,5 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 
+import styles from "./table.module.css";
+
 interface TableColumn<Row> {
   header: ReactNode;
   id: string;
@@ -38,8 +40,8 @@ function Table<Row>({
   const shouldShowState = isLoading || Boolean(error) || !hasRows;
 
   return (
-    <div className="table-container">
-      <table aria-busy={isLoading || undefined} className="table">
+    <div className={styles.container}>
+      <table aria-busy={isLoading || undefined} className={styles.table}>
         {caption ? <caption>{caption}</caption> : null}
         <thead>
           <tr>
@@ -93,7 +95,7 @@ function TableStateRow({
   if (isLoading) {
     return (
       <tr>
-        <td className="table-state" colSpan={colSpan}>
+        <td className={styles.state} colSpan={colSpan}>
           {messages?.loading ?? "Loading..."}
         </td>
       </tr>
@@ -103,7 +105,7 @@ function TableStateRow({
   if (error) {
     return (
       <tr>
-        <td className="table-state" colSpan={colSpan} role="alert">
+        <td className={styles.state} colSpan={colSpan} role="alert">
           {messages?.error ?? error}
         </td>
       </tr>
@@ -112,7 +114,7 @@ function TableStateRow({
 
   return (
     <tr>
-      <td className="table-state" colSpan={colSpan}>
+      <td className={styles.state} colSpan={colSpan}>
         {messages?.empty ?? "No records found."}
       </td>
     </tr>

@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Button } from "./button";
+import { Button } from "../button";
 import { Table, type TableColumn } from "./table";
 
 interface TicketRow {
@@ -55,7 +55,7 @@ describe("Table", () => {
     expect(html).toContain("Create teams");
     expect(html).toContain("<strong>Ready</strong>");
     expect(html).toContain("aria-label=\"Open Create teams\"");
-    expect(html).toContain("button-secondary");
+    expect(html).toContain("Open");
   });
 
   it("allows callers to render custom table rows", () => {

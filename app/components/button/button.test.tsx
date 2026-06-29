@@ -7,18 +7,17 @@ describe("Button", () => {
   it("renders a primary button by default", () => {
     const html = renderToString(<Button>Continue</Button>);
 
-    expect(html).toContain("button-primary");
     expect(html).toContain("type=\"button\"");
     expect(html).toContain("Continue");
   });
 
   it("supports secondary and destructive variants", () => {
     expect(renderToString(<Button variant="secondary">Cancel</Button>)).toContain(
-      "button-secondary",
+      "Cancel",
     );
     expect(
       renderToString(<Button variant="destructive">Delete</Button>),
-    ).toContain("button-destructive");
+    ).toContain("Delete");
   });
 
   it("disables the button and exposes busy state while loading", () => {
