@@ -3,7 +3,10 @@ import { useActionData, useLoaderData } from "react-router";
 import { Button } from "~/components/button";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
-import { listEpicsWithTeams, type EpicWithTeam } from "~/services/epics.server";
+import {
+  listEpicManagementRows,
+  type EpicManagementRow,
+} from "~/services/epics.server";
 import { requireAuthenticatedUser } from "~/services/session.server";
 import { listTeams, type Team } from "~/services/teams.server";
 
@@ -16,7 +19,7 @@ export type ActionData = {
 };
 
 type LoaderData = {
-  epics: EpicWithTeam[];
+  epics: EpicManagementRow[];
   teams: Team[];
   userEmail: string;
 };
@@ -29,7 +32,7 @@ export async function loader({ request }: { request: Request }) {
   const user = await requireAuthenticatedUser(request);
 
   return {
-    epics: listEpicsWithTeams(db),
+    epics: listEpicManagementRows(db),
     teams: listTeams(db),
     userEmail: user.email,
   } satisfies LoaderData;
@@ -48,11 +51,11 @@ export function EpicsView({
   userEmail = "user@example.com",
 }: {
   actionData?: ActionData;
-  epics?: EpicWithTeam[];
+  epics?: EpicManagementRow[];
   teams?: Team[];
   userEmail?: string;
 }) {
-  const columns: Array<TableColumn<EpicWithTeam>> = [
+  const columns: Array<TableColumn<EpicManagementRow>> = [
     {
       header: "Team",
       id: "team",
@@ -69,9 +72,9 @@ export function EpicsView({
       renderCell: (epic) => epic.description ?? "",
     },
     {
-      header: "Created",
-      id: "created",
-      renderCell: (epic) => epic.createdAt,
+      header: "Tickets",
+      id: "tickets",
+      renderCell: (epic) => epic.ticketCount,
     },
     {
       header: "Modified",
@@ -106,9 +109,16 @@ export function EpicsView({
           <form className="inline-form" method="post">
             <input name="intent" type="hidden" value="delete" />
             <input name="epicId" type="hidden" value={epic.id} />
-            <Button type="submit" variant="destructive">
+            <Button
+              disabled={epic.ticketCount > 0}
+              type="submit"
+              variant="destructive"
+            >
               Delete
             </Button>
+            {epic.ticketCount > 0 ? (
+              <p>{getBlockedDeleteCopy(epic.ticketCount)}</p>
+            ) : null}
           </form>
         </div>
       ),
@@ -154,6 +164,13 @@ export function EpicsView({
       />
     </ScreenShell>
   );
+}
+
+function getBlockedDeleteCopy(ticketCount: number) {
+  const ticketLabel =
+    ticketCount === 1 ? "ticket references" : "tickets reference";
+
+  return `Delete unavailable while ${ticketCount} ${ticketLabel} this epic.`;
 }
 
 export default function Epics() {
