@@ -8,6 +8,8 @@ import { createEpic } from "../epics/epics.server";
 import { createTeam, type AppDb } from "../teams/teams.server";
 import {
   createTicket,
+  getTicketById,
+  listTicketsForTeam,
   mapTicketCreateError,
   normalizeTicketBody,
   normalizeTicketTitle,
@@ -264,6 +266,162 @@ describe("ticket service", () => {
       modifiedAt: now.toISOString(),
     });
     expect(database.select().from(schema.tickets).all()).toEqual([ticket]);
+  });
+
+  it("returns not-found when reading a missing ticket", () => {
+    expect(
+      getTicketById(database, { id: "missing-ticket" })._unsafeUnwrapErr(),
+    ).toBe("not-found");
+  });
+
+  it("reads a ticket with joined display data", () => {
+    const team = createTeamForTest("Platform");
+    const epic = createEpicForTest(team.id, "Launch Plan");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        epicId: epic.id,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(getTicketById(database, { id: ticket.id })._unsafeUnwrap()).toEqual({
+      ...ticket,
+      teamName: "Platform",
+      epicTitle: "Launch Plan",
+      createdByEmail: "user@example.com",
+    });
+  });
+
+  it("preserves null epic display data when reading and listing tickets", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        epicId: null,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(
+      getTicketById(database, { id: ticket.id })._unsafeUnwrap(),
+    ).toMatchObject({
+      epicId: null,
+      epicTitle: null,
+    });
+    expect(listTicketsForTeam(database, { teamId: team.id })).toMatchObject([
+      {
+        id: ticket.id,
+        epicId: null,
+        epicTitle: null,
+      },
+    ]);
+  });
+
+  it("lists tickets only for the requested team", () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const platformTicket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        createdBy: "user-1",
+        title: "Platform ticket",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+    createTicket(
+      database,
+      {
+        teamId: product.id,
+        createdBy: "user-1",
+        title: "Product ticket",
+        body: "Create a focused frontend route",
+        type: "task",
+        state: "todo",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(listTicketsForTeam(database, { teamId: platform.id })).toEqual([
+      {
+        ...platformTicket,
+        teamName: "Platform",
+        epicTitle: null,
+        createdByEmail: "user@example.com",
+      },
+    ]);
+  });
+
+  it("orders listed tickets by most recently modified first", () => {
+    const team = createTeamForTest();
+    const oldest = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Oldest",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => new Date("2026-06-30T10:00:00.000Z") },
+    )._unsafeUnwrap();
+    const newest = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Newest",
+        body: "Create a focused frontend route",
+        type: "task",
+        state: "todo",
+      },
+      { now: () => new Date("2026-06-30T10:05:00.000Z") },
+    )._unsafeUnwrap();
+    const middle = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Middle",
+        body: "Connect the service later",
+        type: "task",
+        state: "todo",
+      },
+      { now: () => new Date("2026-06-30T10:02:00.000Z") },
+    )._unsafeUnwrap();
+
+    sqlite
+      .prepare("UPDATE tickets SET modified_at = ? WHERE id = ?")
+      .run("2026-06-30T10:01:00.000Z", oldest.id);
+    sqlite
+      .prepare("UPDATE tickets SET modified_at = ? WHERE id = ?")
+      .run("2026-06-30T10:03:00.000Z", middle.id);
+    sqlite
+      .prepare("UPDATE tickets SET modified_at = ? WHERE id = ?")
+      .run("2026-06-30T10:06:00.000Z", newest.id);
+
+    expect(
+      listTicketsForTeam(database, { teamId: team.id }).map(
+        (ticket) => ticket.title,
+      ),
+    ).toEqual(["Newest", "Middle", "Oldest"]);
   });
 
   it("maps create errors to user-facing messages", () => {
