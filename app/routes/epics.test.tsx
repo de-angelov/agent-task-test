@@ -38,13 +38,32 @@ beforeEach(() => {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
+    CREATE TABLE users (
+      id text PRIMARY KEY NOT NULL,
+      email text NOT NULL UNIQUE,
+      password_hash text NOT NULL,
+      email_verified_at integer,
+      created_at integer NOT NULL
+    );
+
     CREATE TABLE tickets (
       id text PRIMARY KEY NOT NULL,
       team_id text NOT NULL,
       epic_id text,
+      title text NOT NULL,
+      body text NOT NULL,
+      type text NOT NULL,
+      state text NOT NULL,
+      created_by_user_id text NOT NULL,
+      created_at text NOT NULL,
+      modified_at text NOT NULL,
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE
+      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
+
+    INSERT INTO users (id, email, password_hash, created_at)
+    VALUES ('user-1', 'user-1@example.com', 'hash', 1782634635389);
   `);
   database = drizzle(sqlite, { schema });
 });
@@ -280,7 +299,18 @@ describe("epics route", () => {
 
     database
       .insert(schema.tickets)
-      .values({ id: "ticket-1", teamId: team.id, epicId: epic.id })
+      .values({
+        id: "ticket-1",
+        teamId: team.id,
+        epicId: epic.id,
+        title: "Blocked ticket",
+        body: "",
+        type: "task",
+        state: "todo",
+        createdByUserId: "user-1",
+        createdAt: now.toISOString(),
+        modifiedAt: now.toISOString(),
+      })
       .run();
 
     const result = unwrapActionData(

@@ -77,6 +77,48 @@ describe("fresh database initialization", () => {
         const rowCount = countRowsIfTableExists(sqlite, tableName);
         expect(rowCount).toBe(0);
       }
+
+      const ticketColumns = sqlite
+        .prepare("PRAGMA table_info(tickets)")
+        .all() as Array<{ name: string; notnull: 0 | 1 }>;
+
+      expect(
+        ticketColumns.map((column) => ({
+          name: column.name,
+          required: column.notnull === 1,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { name: "id", required: true },
+          { name: "team_id", required: true },
+          { name: "epic_id", required: false },
+          { name: "title", required: true },
+          { name: "body", required: true },
+          { name: "type", required: true },
+          { name: "state", required: true },
+          { name: "created_by_user_id", required: true },
+          { name: "created_at", required: true },
+          { name: "modified_at", required: true },
+        ]),
+      );
+
+      const ticketForeignKeys = sqlite
+        .prepare("PRAGMA foreign_key_list(tickets)")
+        .all() as Array<{ from: string; table: string; on_delete: string }>;
+
+      expect(
+        ticketForeignKeys.map((foreignKey) => ({
+          from: foreignKey.from,
+          table: foreignKey.table,
+          onDelete: foreignKey.on_delete,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { from: "team_id", table: "teams", onDelete: "RESTRICT" },
+          { from: "epic_id", table: "epics", onDelete: "RESTRICT" },
+          { from: "created_by_user_id", table: "users", onDelete: "RESTRICT" },
+        ]),
+      );
     } finally {
       sqlite.close();
     }
