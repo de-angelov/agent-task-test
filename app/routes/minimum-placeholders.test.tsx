@@ -60,7 +60,7 @@ describe("minimum placeholder routes", () => {
 
   it("renders team and epic management placeholders", () => {
     expect(renderToString(<TeamsView />)).toContain("Create team");
-    expect(renderToString(<EpicsView />)).toContain("Create or edit epic");
+    expect(renderToString(<EpicsView />)).toContain("Create epic");
   });
 
   it("keeps public verification route boundary", async () => {
