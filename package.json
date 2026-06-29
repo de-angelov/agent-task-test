@@ -8,7 +8,8 @@
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "test": "react-router typegen && vitest run",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed:dev": "tsx scripts/seed-dev-user.ts"
   },
   "dependencies": {
     "@react-router/node": "^7.6.3",
@@ -33,6 +34,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "drizzle-kit": "^0.31.4",
+    "tsx": "^4.22.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",

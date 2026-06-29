@@ -9,6 +9,7 @@ This repository is bootstrapped as a minimal React Router framework-mode applica
 - `npm test` runs Vitest.
 - `npm run build` builds the production app.
 - `npm run db:migrate` applies Drizzle migrations.
+- `npm run db:seed:dev` creates or refreshes a verified local-only manual QA user, `test@test.com` with password `test`. Run it only for local development databases after migrations.
 
 ## Branch cleanup
 
