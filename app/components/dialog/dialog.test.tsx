@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Button } from "./button";
+import { Button } from "../button";
 import { Dialog } from "./dialog";
 
 describe("Dialog", () => {
@@ -23,8 +23,8 @@ describe("Dialog", () => {
     expect(html).not.toContain("open=\"\"");
     expect(html).toContain("Delete ticket");
     expect(html).toContain("This action cannot be undone.");
-    expect(html).toContain("button-secondary");
-    expect(html).toContain("button-destructive");
+    expect(html).toContain("Cancel");
+    expect(html).toContain("Delete");
   });
 
   it("keeps modal state controlled by the browser dialog API", () => {
