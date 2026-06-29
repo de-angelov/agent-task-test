@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import * as schema from "../db/schema";
+import * as schema from "../../db/schema";
 
-import { hashPassword, normalizeEmail, type AuthDb } from "./auth.server";
+import { hashPassword, normalizeEmail, type AuthDb } from "../auth/auth.server";
 
 export const developmentSeedUser = {
   email: "test@test.com",

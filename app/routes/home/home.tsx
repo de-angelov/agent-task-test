@@ -2,8 +2,8 @@ import { useState } from "react";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
-import { getPlaceholderMessage } from "~/services/placeholder.server";
-import { requireAuthenticatedUser } from "~/services/session.server";
+import { getPlaceholderMessage } from "~/services/placeholder/placeholder.server";
+import { requireAuthenticatedUser } from "~/services/session/session.server";
 
 export function meta() {
   return [

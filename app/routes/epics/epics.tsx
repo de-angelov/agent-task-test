@@ -6,12 +6,12 @@ import { db } from "~/db/client.server";
 import {
   listEpicManagementRows,
   type EpicManagementRow,
-} from "~/services/epics.server";
-import { requireAuthenticatedUser } from "~/services/session.server";
-import { listTeams, type Team } from "~/services/teams.server";
+} from "~/services/epics/epics.server";
+import { requireAuthenticatedUser } from "~/services/session/session.server";
+import { listTeams, type Team } from "~/services/teams/teams.server";
 
 import { handleEpicAction } from "./epics-action.server";
-import { ScreenShell } from "./placeholder-ui";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 export type ActionData = {
   message: string;

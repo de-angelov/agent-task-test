@@ -5,7 +5,7 @@ import * as schema from "../app/db/schema";
 import {
   developmentSeedUser,
   seedDevelopmentUser,
-} from "../app/services/development-seed.server";
+} from "../app/services/development-seed/development-seed.server";
 
 const databaseUrl = process.env.DATABASE_URL ?? "local.db";
 const sqlite = new Database(databaseUrl);

@@ -1,8 +1,8 @@
 import { useLoaderData } from "react-router";
 
-import { requireAuthenticatedUser } from "~/services/session.server";
+import { requireAuthenticatedUser } from "~/services/session/session.server";
 
-import { PlaceholderNotice, ScreenShell } from "./placeholder-ui";
+import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;

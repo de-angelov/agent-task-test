@@ -2,7 +2,7 @@ import { redirect, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
 import { db } from "~/db/client.server";
-import { verifyEmailToken } from "~/services/auth.server";
+import { verifyEmailToken } from "~/services/auth/auth.server";
 
 import { AuthNotice, AuthPanel } from "./auth-ui";
 

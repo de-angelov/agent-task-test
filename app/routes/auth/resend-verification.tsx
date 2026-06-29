@@ -1,8 +1,8 @@
 import { redirect, useActionData } from "react-router";
 
 import { db } from "~/db/client.server";
-import { resendVerificationEmail } from "~/services/auth.server";
-import { createSmtpEmailSender, getAppBaseUrl } from "~/services/email.server";
+import { resendVerificationEmail } from "~/services/auth/auth.server";
+import { createSmtpEmailSender, getAppBaseUrl } from "~/services/email/email.server";
 
 import {
   AuthField,

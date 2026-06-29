@@ -1,4 +1,4 @@
-import { logout } from "~/services/session.server";
+import { logout } from "~/services/session/session.server";
 
 type ActionArgs = {
   request: Request;

@@ -10,7 +10,7 @@ import {
   type Clock,
 } from "~/lib/timestamps.server";
 
-import type { AppDb } from "./teams.server";
+import type { AppDb } from "../teams/teams.server";
 
 export interface Epic {
   id: string;
