@@ -77,6 +77,74 @@ describe("fresh database initialization", () => {
         const rowCount = countRowsIfTableExists(sqlite, tableName);
         expect(rowCount).toBe(0);
       }
+
+      const ticketColumns = sqlite
+        .prepare("PRAGMA table_info(tickets)")
+        .all() as Array<{ name: string; notnull: 0 | 1 }>;
+
+      expect(
+        ticketColumns.map((column) => ({
+          name: column.name,
+          required: column.notnull === 1,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { name: "id", required: true },
+          { name: "title", required: true },
+          { name: "body", required: true },
+          { name: "type", required: true },
+          { name: "state", required: true },
+          { name: "team_id", required: true },
+          { name: "epic_id", required: false },
+          { name: "created_by", required: true },
+          { name: "created_at", required: true },
+          { name: "modified_at", required: true },
+        ]),
+      );
+
+      const ticketForeignKeys = sqlite
+        .prepare("PRAGMA foreign_key_list(tickets)")
+        .all() as Array<{
+          from: string;
+          on_delete: string;
+          on_update: string;
+          table: string;
+          to: string;
+        }>;
+
+      expect(
+        ticketForeignKeys.map((foreignKey) => ({
+          from: foreignKey.from,
+          onDelete: foreignKey.on_delete,
+          onUpdate: foreignKey.on_update,
+          table: foreignKey.table,
+          to: foreignKey.to,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          {
+            from: "team_id",
+            onDelete: "RESTRICT",
+            onUpdate: "CASCADE",
+            table: "teams",
+            to: "id",
+          },
+          {
+            from: "epic_id",
+            onDelete: "RESTRICT",
+            onUpdate: "CASCADE",
+            table: "epics",
+            to: "id",
+          },
+          {
+            from: "created_by",
+            onDelete: "RESTRICT",
+            onUpdate: "CASCADE",
+            table: "users",
+            to: "id",
+          },
+        ]),
+      );
     } finally {
       sqlite.close();
     }

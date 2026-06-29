@@ -1,5 +1,7 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+import { ticketStates, ticketTypes } from "~/services/ticket-workflow.server";
+
 export const appMetadata = sqliteTable("app_metadata", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   key: text("key").notNull().unique(),
@@ -25,8 +27,20 @@ export const epics = sqliteTable("epics", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  emailVerifiedAt: integer("email_verified_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
 export const tickets = sqliteTable("tickets", {
   id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  type: text("type", { enum: ticketTypes }).notNull(),
+  state: text("state", { enum: ticketStates }).notNull(),
   teamId: text("team_id")
     .notNull()
     .references(() => teams.id, { onDelete: "restrict", onUpdate: "cascade" }),
@@ -34,14 +48,11 @@ export const tickets = sqliteTable("tickets", {
     onDelete: "restrict",
     onUpdate: "cascade",
   }),
-});
-
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  emailVerifiedAt: integer("email_verified_at"),
-  createdAt: integer("created_at").notNull(),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+  createdAt: text("created_at").notNull(),
+  modifiedAt: text("modified_at").notNull(),
 });
 
 export const emailVerificationTokens = sqliteTable("email_verification_tokens", {
