@@ -5,7 +5,7 @@ import { useLoaderData } from "react-router";
 import { db } from "~/db/client.server";
 import { verifyEmailToken } from "~/services/auth.server";
 
-import { PlaceholderNotice, PublicScreenShell } from "./placeholder-ui";
+import { AuthNotice, AuthPanel } from "./auth-ui";
 
 type VerificationStatus = "invalid-token" | "expired-token" | "token-already-used";
 
@@ -47,16 +47,17 @@ export function VerifyEmailView({
     .exhaustive();
 
   return (
-    <PublicScreenShell title="Email verification">
-      <PlaceholderNotice>{message}</PlaceholderNotice>
-      <form action="/resend-verification" className="inline-form" method="post">
-        <label className="form-field">
-          <span>Email address</span>
-          <input name="email" type="email" />
-        </label>
-        <button type="submit">Send a new verification email</button>
-      </form>
-    </PublicScreenShell>
+    <AuthPanel
+      footer={
+        <>
+          <a href="/resend-verification">Send a new verification email</a>
+          <a href="/login">Return to log in</a>
+        </>
+      }
+      title="Email verification"
+    >
+      <AuthNotice tone="error">{message}</AuthNotice>
+    </AuthPanel>
   );
 }
 
