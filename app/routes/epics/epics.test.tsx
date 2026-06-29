@@ -38,16 +38,50 @@ beforeEach(() => {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
+    CREATE TABLE users (
+      id text PRIMARY KEY NOT NULL,
+      email text NOT NULL UNIQUE,
+      password_hash text NOT NULL,
+      email_verified_at integer,
+      created_at integer NOT NULL
+    );
+
     CREATE TABLE tickets (
       id text PRIMARY KEY NOT NULL,
+      title text NOT NULL,
+      body text NOT NULL,
+      type text NOT NULL,
+      state text NOT NULL,
       team_id text NOT NULL,
       epic_id text,
+      created_by text NOT NULL,
+      created_at text NOT NULL,
+      modified_at text NOT NULL,
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE
+      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
+
+    INSERT INTO users (id, email, password_hash, created_at)
+    VALUES ('user-1', 'user@example.com', 'hash', ${now.getTime()});
   `);
   database = drizzle(sqlite, { schema });
 });
+
+function createTicketValues(id: string, teamId: string, epicId: string | null = null) {
+  return {
+    id,
+    title: `Ticket ${id}`,
+    body: "",
+    type: "task",
+    state: "backlog",
+    teamId,
+    epicId,
+    createdBy: "user-1",
+    createdAt: now.toISOString(),
+    modifiedAt: now.toISOString(),
+  } as const;
+}
 
 function createFormData(entries: Record<string, string>) {
   const formData = new FormData();
@@ -280,7 +314,7 @@ describe("epics route", () => {
 
     database
       .insert(schema.tickets)
-      .values({ id: "ticket-1", teamId: team.id, epicId: epic.id })
+      .values(createTicketValues("ticket-1", team.id, epic.id))
       .run();
 
     const result = unwrapActionData(

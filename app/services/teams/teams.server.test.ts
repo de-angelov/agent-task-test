@@ -43,16 +43,50 @@ beforeEach(() => {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
+    CREATE TABLE users (
+      id text PRIMARY KEY NOT NULL,
+      email text NOT NULL UNIQUE,
+      password_hash text NOT NULL,
+      email_verified_at integer,
+      created_at integer NOT NULL
+    );
+
     CREATE TABLE tickets (
       id text PRIMARY KEY NOT NULL,
+      title text NOT NULL,
+      body text NOT NULL,
+      type text NOT NULL,
+      state text NOT NULL,
       team_id text NOT NULL,
       epic_id text,
+      created_by text NOT NULL,
+      created_at text NOT NULL,
+      modified_at text NOT NULL,
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE
+      FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
+
+    INSERT INTO users (id, email, password_hash, created_at)
+    VALUES ('user-1', 'user@example.com', 'hash', ${now.getTime()});
   `);
   database = drizzle(sqlite, { schema });
 });
+
+function createTicketValues(id: string, teamId: string, epicId: string | null = null) {
+  return {
+    id,
+    title: `Ticket ${id}`,
+    body: "",
+    type: "task",
+    state: "backlog",
+    teamId,
+    epicId,
+    createdBy: "user-1",
+    createdAt: now.toISOString(),
+    modifiedAt: now.toISOString(),
+  } as const;
+}
 
 describe("team service", () => {
   it("normalizes names for display and uniqueness", () => {
@@ -115,9 +149,9 @@ describe("team service", () => {
     database
       .insert(schema.tickets)
       .values([
-        { id: "ticket-1", teamId: activeTeam.id, epicId: "epic-1" },
-        { id: "ticket-2", teamId: activeTeam.id, epicId: "epic-2" },
-        { id: "ticket-3", teamId: activeTeam.id, epicId: null },
+        createTicketValues("ticket-1", activeTeam.id, "epic-1"),
+        createTicketValues("ticket-2", activeTeam.id, "epic-2"),
+        createTicketValues("ticket-3", activeTeam.id),
       ])
       .run();
 
@@ -202,7 +236,10 @@ describe("team service", () => {
       { now: () => now },
     )._unsafeUnwrap();
 
-    database.insert(schema.tickets).values({ id: "ticket-1", teamId: ticketTeam.id }).run();
+    database
+      .insert(schema.tickets)
+      .values(createTicketValues("ticket-1", ticketTeam.id))
+      .run();
     database
       .insert(schema.epics)
       .values({
