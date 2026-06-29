@@ -8,10 +8,10 @@ import { requireAuthenticatedUser } from "~/services/session.server";
 import {
   createTeam,
   deleteTeam,
-  listTeams,
+  listTeamManagementRows,
   mapTeamMutationError,
   renameTeam,
-  type Team,
+  type TeamManagementRow,
 } from "~/services/teams.server";
 
 import { ScreenShell } from "./placeholder-ui";
@@ -22,7 +22,7 @@ type ActionData = {
 };
 
 type LoaderData = {
-  teams: Team[];
+  teams: TeamManagementRow[];
   userEmail: string;
 };
 
@@ -34,7 +34,7 @@ export async function loader({ request }: { request: Request }) {
   const user = await requireAuthenticatedUser(request);
 
   return {
-    teams: listTeams(db),
+    teams: listTeamManagementRows(db),
     userEmail: user.email,
   } satisfies LoaderData;
 }
@@ -96,19 +96,24 @@ export function TeamsView({
   userEmail = "user@example.com",
 }: {
   actionData?: ActionData;
-  teams?: Team[];
+  teams?: TeamManagementRow[];
   userEmail?: string;
 }) {
-  const columns: Array<TableColumn<Team>> = [
+  const columns: Array<TableColumn<TeamManagementRow>> = [
     {
       header: "Name",
       id: "name",
       renderCell: (team) => team.name,
     },
     {
-      header: "Created",
-      id: "created",
-      renderCell: (team) => team.createdAt,
+      header: "Tickets",
+      id: "tickets",
+      renderCell: (team) => team.ticketCount,
+    },
+    {
+      header: "Epics",
+      id: "epics",
+      renderCell: (team) => team.epicCount,
     },
     {
       header: "Modified",
@@ -128,15 +133,27 @@ export function TeamsView({
               <input defaultValue={team.name} name="name" />
             </label>
             <Button type="submit" variant="secondary">
-              Rename
+              Save team
             </Button>
           </form>
           <form className="inline-form" method="post">
             <input name="intent" type="hidden" value="delete" />
             <input name="teamId" type="hidden" value={team.id} />
-            <Button type="submit" variant="destructive">
+            <Button
+              aria-describedby={
+                isTeamDeleteBlocked(team) ? `${team.id}-delete-blocked` : undefined
+              }
+              disabled={isTeamDeleteBlocked(team)}
+              type="submit"
+              variant="destructive"
+            >
               Delete
             </Button>
+            {isTeamDeleteBlocked(team) ? (
+              <p id={`${team.id}-delete-blocked`}>
+                Delete blocked until this team has no tickets or epics.
+              </p>
+            ) : null}
           </form>
         </div>
       ),
@@ -168,6 +185,10 @@ export function TeamsView({
       />
     </ScreenShell>
   );
+}
+
+function isTeamDeleteBlocked(team: TeamManagementRow) {
+  return team.ticketCount > 0 || team.epicCount > 0;
 }
 
 export default function Teams() {
