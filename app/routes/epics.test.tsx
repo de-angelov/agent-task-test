@@ -87,7 +87,8 @@ describe("epics route", () => {
     const html = renderToString(
       <EpicsView
         actionData={{
-          message: "Remove the epic from referenced tickets before deleting it.",
+          message:
+            "Remove the epic from referenced tickets before deleting it.",
           status: "error",
         }}
         epics={[
@@ -99,6 +100,7 @@ describe("epics route", () => {
             description: "Coordinate the MVP launch",
             createdAt: "2026-06-28T10:00:00.000Z",
             updatedAt: "2026-06-28T11:00:00.000Z",
+            ticketCount: 2,
           },
         ]}
         teams={[
@@ -117,13 +119,50 @@ describe("epics route", () => {
     expect(html).toContain("Platform");
     expect(html).toContain("Launch Plan");
     expect(html).toContain("Coordinate the MVP launch");
-    expect(html).toContain("2026-06-28T10:00:00.000Z");
+    expect(html).toContain('<th scope="col">Tickets</th>');
+    expect(html).toContain("<td>2</td>");
     expect(html).toContain("2026-06-28T11:00:00.000Z");
     expect(html).toContain("Save epic");
     expect(html).toContain("Delete");
+    expect(html).toContain('disabled=""');
+    expect(html).toContain(
+      "Delete unavailable while 2 tickets reference this epic.",
+    );
     expect(html).toContain(
       "Remove the epic from referenced tickets before deleting it.",
     );
+  });
+
+  it("renders an enabled delete action for epics without tickets", () => {
+    const html = renderToString(
+      <EpicsView
+        epics={[
+          {
+            id: "epic-1",
+            teamId: "team-1",
+            teamName: "Platform",
+            title: "Launch Plan",
+            description: null,
+            createdAt: "2026-06-28T10:00:00.000Z",
+            updatedAt: "2026-06-28T11:00:00.000Z",
+            ticketCount: 0,
+          },
+        ]}
+        teams={[
+          {
+            id: "team-1",
+            name: "Platform",
+            normalizedName: "platform",
+            createdAt: "2026-06-28T10:00:00.000Z",
+            updatedAt: "2026-06-28T10:00:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("<td>0</td>");
+    expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain("Delete unavailable while");
   });
 
   it("requires authentication for reads and writes", async () => {
@@ -157,11 +196,15 @@ describe("epics route", () => {
       status: "success",
     });
     expect(
-      database.select().from(schema.epics).all().map((epic) => ({
-        teamId: epic.teamId,
-        title: epic.title,
-        description: epic.description,
-      })),
+      database
+        .select()
+        .from(schema.epics)
+        .all()
+        .map((epic) => ({
+          teamId: epic.teamId,
+          title: epic.title,
+          description: epic.description,
+        })),
     ).toEqual([
       {
         teamId: team.id,
