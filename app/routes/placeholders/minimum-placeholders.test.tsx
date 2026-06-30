@@ -54,7 +54,29 @@ describe("minimum placeholder routes", () => {
   it("renders board and ticket placeholders", () => {
     const board = renderToString(<BoardView />);
     const create = renderToString(<TicketCreateView />);
-    const details = renderToString(<TicketDetailsView ticketId="TICKET-1" />);
+    const details = renderToString(
+      <TicketDetailsView
+        data={{
+          status: "found",
+          ticket: {
+            id: "TICKET-1",
+            title: "Set up account verification",
+            body: "Send verification emails after signup.",
+            type: "feature",
+            state: "backlog",
+            teamId: "team-1",
+            teamName: "Platform",
+            epicId: null,
+            epicTitle: null,
+            createdBy: "user-1",
+            createdByEmail: "creator@example.com",
+            createdAt: "2026-06-28T00:00:00.000Z",
+            modifiedAt: "2026-06-28T00:00:00.000Z",
+          },
+          userEmail: "user@example.com",
+        }}
+      />,
+    );
     const edit = renderToString(<TicketEditView ticketId="TICKET-1" />);
 
     expect(board).toContain("Ready for implementation");
@@ -62,7 +84,8 @@ describe("minimum placeholder routes", () => {
     expect(board).toContain("user@example.com");
     expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
-    expect(details).toContain("Viewing ticket TICKET-1");
+    expect(details).toContain("Set up account verification");
+    expect(details).toContain('href="/tickets/TICKET-1/edit"');
     expect(edit).toContain("Editing ticket TICKET-1");
   });
 
