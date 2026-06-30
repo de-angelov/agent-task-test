@@ -28,6 +28,11 @@ export type ResetPasswordError =
   | "token-already-used"
   | "password-too-short";
 
+export type PasswordResetTokenValidationError =
+  | "invalid-token"
+  | "expired-token"
+  | "token-already-used";
+
 type PasswordResetServiceDependencies = {
   db: AuthDb;
   emailSender: PasswordResetEmailSender;
@@ -83,8 +88,63 @@ export async function resetPasswordWithToken(
     return err(password.error);
   }
 
+  const tokenResult = findUsablePasswordResetToken(input.token, dependencies);
+  if (tokenResult.isErr()) {
+    return err(tokenResult.error);
+  }
+
   const now = dependencies.now?.() ?? new Date();
-  const tokenHash = hashToken(input.token);
+  const { resetToken, user } = tokenResult.value;
+  const passwordHash = await hashPassword(password.value);
+
+  dependencies.db
+    .update(schema.users)
+    .set({ passwordHash })
+    .where(eq(schema.users.id, user.id))
+    .run();
+
+  dependencies.db
+    .update(schema.passwordResetTokens)
+    .set({ usedAt: now.getTime() })
+    .where(eq(schema.passwordResetTokens.id, resetToken.id))
+    .run();
+
+  return ok({ email: user.email });
+}
+
+export function validatePasswordResetToken(
+  input: { token: string },
+  dependencies: ResetPasswordDependencies,
+): Result<{ email: string }, PasswordResetTokenValidationError> {
+  const result = findUsablePasswordResetToken(input.token, dependencies);
+
+  if (result.isErr()) {
+    return err(result.error);
+  }
+
+  return ok({ email: result.value.user.email });
+}
+
+function findUserByEmail(db: AuthDb, email: string): User | undefined {
+  return db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, email))
+    .get();
+}
+
+function findUsablePasswordResetToken(
+  token: string,
+  dependencies: ResetPasswordDependencies,
+): Result<
+  {
+    resetToken: typeof schema.passwordResetTokens.$inferSelect;
+    user: User;
+  },
+  PasswordResetTokenValidationError
+> {
+  const now = dependencies.now?.() ?? new Date();
+  const tokenHash = hashToken(token);
   const resetToken = dependencies.db
     .select()
     .from(schema.passwordResetTokens)
@@ -113,29 +173,7 @@ export async function resetPasswordWithToken(
     return err("invalid-token");
   }
 
-  const passwordHash = await hashPassword(password.value);
-
-  dependencies.db
-    .update(schema.users)
-    .set({ passwordHash })
-    .where(eq(schema.users.id, user.id))
-    .run();
-
-  dependencies.db
-    .update(schema.passwordResetTokens)
-    .set({ usedAt: now.getTime() })
-    .where(eq(schema.passwordResetTokens.id, resetToken.id))
-    .run();
-
-  return ok({ email: user.email });
-}
-
-function findUserByEmail(db: AuthDb, email: string): User | undefined {
-  return db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email))
-    .get();
+  return ok({ resetToken, user });
 }
 
 function issuePasswordResetToken(
