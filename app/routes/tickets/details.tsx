@@ -1,11 +1,13 @@
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
+import { db } from "~/db/client.server";
+import {
+  getTicketById,
+  type TicketReadModel,
+} from "~/services/tickets/tickets.server";
+import { type TicketState } from "~/services/tickets/ticket-workflow";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
-import type { TicketReadModel } from "~/services/tickets/tickets.server";
-
-import { readTicketDetails, type LoaderData } from "./details.server";
-import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;
@@ -14,70 +16,93 @@ type LoaderArgs = {
   };
 };
 
+type TicketDetailsLoaderData =
+  | {
+      status: "found";
+      ticket: TicketReadModel;
+    }
+  | {
+      status: "not-found";
+      ticketId: string;
+    };
+
 export function meta() {
   return [{ title: "Ticket Details" }];
 }
 
-export async function loader({ request, params }: LoaderArgs) {
+export async function loader({
+  request,
+  params,
+}: LoaderArgs): Promise<TicketDetailsLoaderData> {
   await requireAuthenticatedUser(request);
 
-  const { db } = await import("~/db/client.server");
+  const ticketResult = getTicketById(db, {
+    id: params.ticketId ?? "",
+  });
 
-  return readTicketDetails(db, params.ticketId ?? "");
+  if (ticketResult.isErr()) {
+    return {
+      status: "not-found",
+      ticketId: params.ticketId ?? "",
+    };
+  }
+
+  return {
+    status: "found",
+    ticket: ticketResult.value,
+  };
 }
 
-function getStateLabel(state: TicketReadModel["state"]) {
+function getTicketStateLabel(state: TicketState): string {
   return match(state)
-    .with("backlog", () => "backlog")
-    .with("todo", () => "todo")
-    .with("in-progress", () => "in-progress")
-    .with("done", () => "done")
+    .with("backlog", () => "Backlog")
+    .with("todo", () => "Todo")
+    .with("in-progress", () => "In progress")
+    .with("done", () => "Done")
     .exhaustive();
 }
 
-function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
-  return (
-    <dl className="details-list">
-      <dt>Title</dt>
-      <dd>{ticket.title}</dd>
-      <dt>Body</dt>
-      <dd>{ticket.body}</dd>
-      <dt>Type</dt>
-      <dd>{ticket.type}</dd>
-      <dt>Team</dt>
-      <dd>{ticket.teamName}</dd>
-      <dt>Epic</dt>
-      <dd>{ticket.epicTitle ?? "No epic"}</dd>
-      <dt>State</dt>
-      <dd>{getStateLabel(ticket.state)}</dd>
-      <dt>Created by</dt>
-      <dd>{ticket.createdByEmail}</dd>
-      <dt>Created at</dt>
-      <dd>
-        <time dateTime={ticket.createdAt}>{ticket.createdAt}</time>
-      </dd>
-      <dt>Modified at</dt>
-      <dd>
-        <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
-      </dd>
-    </dl>
-  );
-}
+export function TicketDetailsView({
+  data,
+}: {
+  data: TicketDetailsLoaderData;
+}) {
+  if (data.status === "not-found") {
+    return (
+      <main>
+        <h1>Ticket details</h1>
+        <p>Ticket {data.ticketId} was not found.</p>
+      </main>
+    );
+  }
 
-export function TicketDetailsView({ data }: { data: LoaderData }) {
+  const { ticket } = data;
+
   return (
-    <ScreenShell title="Ticket details">
-      {data.status === "found" ? (
-        <>
-          <TicketDetailsFields ticket={data.ticket} />
-          <a className="button-link" href={`/tickets/${data.ticket.id}/edit`}>
-            Edit ticket
-          </a>
-        </>
-      ) : (
-        <p role="status">Ticket {data.ticketId} was not found.</p>
-      )}
-    </ScreenShell>
+    <main>
+      <h1>Ticket details</h1>
+      <section aria-labelledby="ticket-title">
+        <h2 id="ticket-title">{ticket.title}</h2>
+        <p>{ticket.body}</p>
+        <dl>
+          <dt>Type</dt>
+          <dd>{ticket.type}</dd>
+          <dt>Team</dt>
+          <dd>{ticket.teamName}</dd>
+          <dt>Epic</dt>
+          <dd>{ticket.epicTitle ?? "No epic"}</dd>
+          <dt>State</dt>
+          <dd>{getTicketStateLabel(ticket.state)}</dd>
+          <dt>Created by</dt>
+          <dd>{ticket.createdByEmail}</dd>
+          <dt>Created timestamp</dt>
+          <dd>{ticket.createdAt}</dd>
+          <dt>Modified timestamp</dt>
+          <dd>{ticket.modifiedAt}</dd>
+        </dl>
+        <Link to={`/tickets/${ticket.id}/edit`}>Edit ticket</Link>
+      </section>
+    </main>
   );
 }
 
