@@ -28,6 +28,7 @@ export async function loader({ request }: LoaderArgs) {
 
   return {
     verified: url.searchParams.get("verified") === "1",
+    passwordReset: url.searchParams.get("passwordReset") === "1",
   };
 }
 
@@ -55,15 +56,18 @@ export async function action({ request }: ActionArgs) {
 export function LoginView({
   actionData,
   verified = false,
+  passwordReset = false,
 }: {
   actionData?: Exclude<Awaited<ReturnType<typeof action>>, Response>;
   verified?: boolean;
+  passwordReset?: boolean;
 }) {
   return (
     <AuthPanel
       footer={
         <>
           <a href="/signup">Create an account</a>
+          <a href="/forgot-password">Forgot password?</a>
           <a href="/resend-verification">Resend verification email</a>
         </>
       }
@@ -72,6 +76,11 @@ export function LoginView({
       {verified ? (
         <AuthNotice tone="success">
           Email verified. You can now log in.
+        </AuthNotice>
+      ) : null}
+      {passwordReset ? (
+        <AuthNotice tone="success">
+          Password reset. You can now log in.
         </AuthNotice>
       ) : null}
       <AuthNotice>
@@ -93,5 +102,11 @@ export default function Login() {
   const actionData = useActionData<typeof action>();
   const data = useLoaderData<typeof loader>();
 
-  return <LoginView actionData={actionData} verified={data.verified} />;
+  return (
+    <LoginView
+      actionData={actionData}
+      passwordReset={data.passwordReset}
+      verified={data.verified}
+    />
+  );
 }
