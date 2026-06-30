@@ -54,7 +54,11 @@ describe("minimum placeholder routes", () => {
   it("renders board and ticket placeholders", () => {
     const board = renderToString(<BoardView />);
     const create = renderToString(<TicketCreateView />);
-    const details = renderToString(<TicketDetailsView ticketId="TICKET-1" />);
+    const details = renderToString(
+      <TicketDetailsView
+        data={{ status: "not-found", ticketId: "TICKET-1" }}
+      />,
+    );
     const edit = renderToString(<TicketEditView ticketId="TICKET-1" />);
 
     expect(board).toContain("Ready for implementation");
@@ -62,7 +66,7 @@ describe("minimum placeholder routes", () => {
     expect(board).toContain("user@example.com");
     expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
-    expect(details).toContain("Viewing ticket TICKET-1");
+    expect(details).toContain("Ticket TICKET-1 was not found.");
     expect(edit).toContain("Editing ticket TICKET-1");
   });
 

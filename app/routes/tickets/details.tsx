@@ -1,8 +1,11 @@
 import { useLoaderData } from "react-router";
+import { match } from "ts-pattern";
 
 import { requireAuthenticatedUser } from "~/services/session/session.server";
+import type { TicketReadModel } from "~/services/tickets/tickets.server";
 
-import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
+import { readTicketDetails, type LoaderData } from "./details.server";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;
@@ -18,38 +21,62 @@ export function meta() {
 export async function loader({ request, params }: LoaderArgs) {
   await requireAuthenticatedUser(request);
 
-  return {
-    status: "placeholder-ticket-details",
-    ticketId: params.ticketId ?? "placeholder",
-  };
+  const { db } = await import("~/db/client.server");
+
+  return readTicketDetails(db, params.ticketId ?? "");
 }
 
-export function TicketDetailsView({ ticketId = "placeholder" }: { ticketId?: string }) {
-  const notice = `Viewing ticket ${ticketId}. Full ticket fields, comments, and delete confirmation will connect to services later.`;
+function getStateLabel(state: TicketReadModel["state"]) {
+  return match(state)
+    .with("backlog", () => "backlog")
+    .with("todo", () => "todo")
+    .with("in-progress", () => "in-progress")
+    .with("done", () => "done")
+    .exhaustive();
+}
 
+function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
+  return (
+    <dl className="details-list">
+      <dt>Title</dt>
+      <dd>{ticket.title}</dd>
+      <dt>Body</dt>
+      <dd>{ticket.body}</dd>
+      <dt>Type</dt>
+      <dd>{ticket.type}</dd>
+      <dt>Team</dt>
+      <dd>{ticket.teamName}</dd>
+      <dt>Epic</dt>
+      <dd>{ticket.epicTitle ?? "No epic"}</dd>
+      <dt>State</dt>
+      <dd>{getStateLabel(ticket.state)}</dd>
+      <dt>Created by</dt>
+      <dd>{ticket.createdByEmail}</dd>
+      <dt>Created at</dt>
+      <dd>
+        <time dateTime={ticket.createdAt}>{ticket.createdAt}</time>
+      </dd>
+      <dt>Modified at</dt>
+      <dd>
+        <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
+      </dd>
+    </dl>
+  );
+}
+
+export function TicketDetailsView({ data }: { data: LoaderData }) {
   return (
     <ScreenShell title="Ticket details">
-      <PlaceholderNotice>{notice}</PlaceholderNotice>
-      <dl className="details-list">
-        <dt>Type</dt>
-        <dd>feature</dd>
-        <dt>Team</dt>
-        <dd>Platform</dd>
-        <dt>Epic</dt>
-        <dd>Authentication</dd>
-        <dt>State</dt>
-        <dd>New</dd>
-        <dt>Created by</dt>
-        <dd>user@example.com</dd>
-        <dt>Created at</dt>
-        <dd>2026-06-28T00:00:00.000Z</dd>
-        <dt>Modified at</dt>
-        <dd>2026-06-28T00:00:00.000Z</dd>
-      </dl>
-      <a className="button-link" href={`/tickets/${ticketId}/edit`}>
-        Edit ticket
-      </a>
-      <button type="button">Delete ticket</button>
+      {data.status === "found" ? (
+        <>
+          <TicketDetailsFields ticket={data.ticket} />
+          <a className="button-link" href={`/tickets/${data.ticket.id}/edit`}>
+            Edit ticket
+          </a>
+        </>
+      ) : (
+        <p role="status">Ticket {data.ticketId} was not found.</p>
+      )}
     </ScreenShell>
   );
 }
@@ -57,5 +84,5 @@ export function TicketDetailsView({ ticketId = "placeholder" }: { ticketId?: str
 export default function TicketDetails() {
   const data = useLoaderData<typeof loader>();
 
-  return <TicketDetailsView ticketId={data.ticketId} />;
+  return <TicketDetailsView data={data} />;
 }
