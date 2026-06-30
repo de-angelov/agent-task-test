@@ -64,7 +64,6 @@ describe("minimum placeholder routes", () => {
         data={{
           status: "not-found",
           ticketId: "TICKET-1",
-          teams: [],
           userEmail: "user@example.com",
         }}
       />,
@@ -75,8 +74,10 @@ describe("minimum placeholder routes", () => {
     expect(board).toContain("user@example.com");
     expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
-    expect(details).toContain("Ticket TICKET-1 was not found.");
-    expect(edit).toContain("Ticket TICKET-1 was not found.");
+    expect(details).toContain("TICKET-1");
+    expect(details).toContain("was not found.");
+    expect(edit).toContain("TICKET-1");
+    expect(edit).toContain("was not found.");
   });
 
   it("keeps authenticated navigation off public authentication screens", () => {

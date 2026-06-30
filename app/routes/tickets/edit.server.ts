@@ -16,6 +16,7 @@ export type TicketEditNotFound = {
   status: "not-found";
   userEmail: string;
   ticketId: string;
+  teams: Team[];
 };
 
 export type LoaderData = TicketEditFound | TicketEditNotFound;
@@ -25,6 +26,7 @@ export function readTicketEdit(
   ticketId: string,
   userEmail: string,
 ): LoaderData {
+  const teams = listTeams(database);
   const ticket = getTicketById(database, { id: ticketId });
 
   if (ticket.isErr()) {
@@ -32,10 +34,10 @@ export function readTicketEdit(
       status: "not-found",
       userEmail,
       ticketId,
+      teams,
     };
   }
 
-  const teams = listTeams(database);
   const epics = listEpics(database, { teamId: ticket.value.teamId });
 
   return {
