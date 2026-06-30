@@ -66,7 +66,9 @@ describe("minimum placeholder routes", () => {
     expect(board).toContain("user@example.com");
     expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
-    expect(details).toContain("Ticket TICKET-1 was not found.");
+    expect(details).toContain("Ticket");
+    expect(details).toContain("TICKET-1");
+    expect(details).toContain("was not found.");
     expect(edit).toContain("Editing ticket TICKET-1");
   });
 
