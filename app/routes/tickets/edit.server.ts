@@ -1,21 +1,23 @@
-import type { AppDb, Team } from "~/services/teams/teams.server";
-import { listTeams } from "~/services/teams/teams.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
-import { getTicketById, type TicketReadModel } from "~/services/tickets/tickets.server";
+import {
+  getTicketById,
+  type TicketReadModel,
+} from "~/services/tickets/tickets.server";
+import { listTeams, type AppDb, type Team } from "~/services/teams/teams.server";
 
 export type TicketEditFound = {
   status: "found";
+  userEmail: string;
   ticket: TicketReadModel;
   teams: Team[];
   epics: Epic[];
-  userEmail: string;
 };
 
 export type TicketEditNotFound = {
   status: "not-found";
+  userEmail: string;
   ticketId: string;
   teams: Team[];
-  userEmail: string;
 };
 
 export type LoaderData = TicketEditFound | TicketEditNotFound;
