@@ -2,13 +2,10 @@ import { useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
+import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 
-import { readTicketEdit, type LoaderData } from "./edit.server";
-import {
-  PlaceholderForm,
-  PlaceholderNotice,
-  ScreenShell,
-} from "../placeholders/placeholder-ui";
+import { readTicketEdit, type LoaderData, type TicketEditFound } from "./edit.server";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;
@@ -16,23 +13,6 @@ type LoaderArgs = {
     ticketId?: string;
   };
 };
-
-export type TicketEditFound = {
-  status: "found";
-  ticket: TicketReadModel;
-  teams: Team[];
-  epics: Epic[];
-  userEmail: string;
-};
-
-export type TicketEditNotFound = {
-  status: "not-found";
-  ticketId: string;
-  teams: Team[];
-  userEmail: string;
-};
-
-export type LoaderData = TicketEditFound | TicketEditNotFound;
 
 export function meta() {
   return [{ title: "Edit Ticket" }];
@@ -79,18 +59,21 @@ function TicketEditForm({ data }: { data: TicketEditFound }) {
       <label className="form-field">
         <span>Type</span>
         <select defaultValue={data.ticket.type} name="type">
-          <option value="feature">feature</option>
-          <option value="bug">bug</option>
-          <option value="task">task</option>
+          {ticketTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
         </select>
       </label>
       <label className="form-field">
         <span>State</span>
         <select defaultValue={data.ticket.state} name="state">
-          <option value="backlog">backlog</option>
-          <option value="todo">todo</option>
-          <option value="in-progress">in-progress</option>
-          <option value="done">done</option>
+          {ticketStates.map((state) => (
+            <option key={state} value={state}>
+              {state}
+            </option>
+          ))}
         </select>
       </label>
       <label className="form-field">
@@ -106,44 +89,14 @@ function TicketEditForm({ data }: { data: TicketEditFound }) {
   );
 }
 
-export function TicketEditView({
-  data,
-  ticketId = "placeholder",
-}: {
-  data?: LoaderData;
-  ticketId?: string;
-}) {
-  if (data) {
-    return (
-      <ScreenShell title="Edit ticket" userEmail={data.userEmail}>
-        {data.status === "found" ? (
-          <TicketEditForm data={data} />
-        ) : (
-          <p role="status">Ticket {data.ticketId} was not found.</p>
-        )}
-      </ScreenShell>
-    );
-  }
-
+export function TicketEditView({ data }: { data: LoaderData }) {
   return (
     <ScreenShell title="Edit ticket" userEmail={data.userEmail}>
-      <PlaceholderNotice>{`Editing ticket ${ticketId}. Saving unchanged values and same-team epic validation will be handled by later services.`}</PlaceholderNotice>
-      <PlaceholderForm
-        actionLabel="Save ticket"
-        fields={[
-          { label: "Title", name: "title", value: "Set up account verification" },
-          { label: "Team", name: "team", value: "Platform" },
-          { label: "Epic", name: "epic", value: "Authentication" },
-          { label: "Type", name: "type", value: "feature" },
-          { label: "State", name: "state", value: "new" },
-        ]}
-        title="Editable fields"
-      >
-        <label className="form-field">
-          <span>Body</span>
-          <textarea defaultValue="Placeholder ticket body" name="body" rows={6} />
-        </label>
-      </PlaceholderForm>
+      {data.status === "found" ? (
+        <TicketEditForm data={data} />
+      ) : (
+        <p role="status">Ticket {data.ticketId} was not found.</p>
+      )}
     </ScreenShell>
   );
 }

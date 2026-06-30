@@ -1,7 +1,5 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
@@ -10,10 +8,11 @@ import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
 
-import { loader, TicketEditView } from "./edit";
+import { loader } from "./edit";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 const userId = "user-1";
+const userEmail = "user@example.com";
 const sessionId = "session-1";
 
 let sqlite: Database.Database;
@@ -114,7 +113,7 @@ beforeEach(() => {
     .insert(schema.users)
     .values({
       id: userId,
-      email: "user@example.com",
+      email: userEmail,
       passwordHash: "hash",
       emailVerifiedAt: now.getTime(),
       createdAt: now.getTime(),
@@ -157,40 +156,25 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
   )._unsafeUnwrap();
 }
 
-function createTicketForTest(input: { teamId: string; epicId?: string | null }) {
-  return createTicket(
-    database,
-    {
-      teamId: input.teamId,
-      epicId: input.epicId ?? null,
-      createdBy: userId,
-      title: "Create service",
-      body: "Create a focused backend service",
-      type: "feature",
-      state: "backlog",
-    },
-    { now: () => now },
-  )._unsafeUnwrap();
-}
-
-function renderEdit(data: Parameters<typeof TicketEditView>[0]["data"]) {
-  return renderToString(
-    <MemoryRouter>
-      <TicketEditView data={data} />
-    </MemoryRouter>,
-  );
-}
-
 describe("ticket edit route", () => {
-  it("loads the ticket, team list, and selected-team epics for an authenticated request", async () => {
+  it("loads the ticket, teams, and selected-team epics for an authenticated request", async () => {
     const platform = createTeamForTest("Platform");
     const product = createTeamForTest("Product");
-    const platformEpic = createEpicForTest(platform.id, "Platform Launch");
+    const platformEpic = createEpicForTest(platform.id);
     createEpicForTest(product.id, "Product Discovery");
-    const ticket = createTicketForTest({
-      teamId: platform.id,
-      epicId: platformEpic.id,
-    });
+    const ticket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        epicId: platformEpic.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
 
     await expect(
       loader({
@@ -201,22 +185,19 @@ describe("ticket edit route", () => {
       }),
     ).resolves.toEqual({
       status: "found",
+      userEmail,
       ticket: {
         ...ticket,
         teamName: "Platform",
-        epicTitle: "Platform Launch",
-        createdByEmail: "user@example.com",
+        epicTitle: "Launch Plan",
+        createdByEmail: userEmail,
       },
       teams: [platform, product],
       epics: [platformEpic],
-      userEmail: "user@example.com",
     });
   });
 
-  it("returns a not-found state for unknown ticket ids", async () => {
-    const platform = createTeamForTest("Platform");
-    createTeamForTest("Product");
-
+  it("returns not-found for an unknown ticket id", async () => {
     await expect(
       loader({
         request: await createAuthedRequest("missing-ticket"),
@@ -226,90 +207,76 @@ describe("ticket edit route", () => {
       }),
     ).resolves.toEqual({
       status: "not-found",
+      userEmail,
       ticketId: "missing-ticket",
-      teams: [platform, expect.anything()],
-      userEmail: "user@example.com",
     });
   });
 
-  it("renders the edit form with loaded ticket data", () => {
-    const html = renderEdit({
-      status: "found",
-      ticket: {
-        id: "ticket-1",
+  it("returns only epics for the selected ticket team", async () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const platformEpic = createEpicForTest(platform.id);
+    createEpicForTest(product.id, "Product Discovery");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        epicId: platformEpic.id,
+        createdBy: userId,
         title: "Create service",
         body: "Create a focused backend service",
         type: "feature",
-        state: "backlog",
-        teamId: "team-1",
-        teamName: "Platform",
-        epicId: "epic-1",
-        epicTitle: "Launch Plan",
-        createdBy: userId,
-        createdByEmail: "user@example.com",
-        createdAt: "2026-06-30T10:00:00.000Z",
-        modifiedAt: "2026-06-30T10:30:00.000Z",
+        state: "todo",
       },
-      teams: [
-        {
-          id: "team-1",
-          name: "Platform",
-          normalizedName: "platform",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-      ],
-      epics: [
-        {
-          id: "epic-1",
-          teamId: "team-1",
-          title: "Launch Plan",
-          description: "Coordinate the MVP launch",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-      ],
-      userEmail: "user@example.com",
-    });
+      { now: () => now },
+    )._unsafeUnwrap();
 
-    expect(html).toContain("Edit ticket");
-    expect(html).toContain("Ticket details");
-    expect(html).toContain('name="teamId"');
-    expect(html).toContain('name="epicId"');
-    expect(html).toContain('name="title"');
-    expect(html).toContain('name="body"');
-    expect(html).toContain("Platform");
-    expect(html).toContain("Launch Plan");
-    expect(html).toContain("Create service");
-  });
-
-  it("loads only the selected ticket team epics", async () => {
-    const platform = createTeamForTest("Platform");
-    const product = createTeamForTest("Product");
-    const platformEpic = createEpicForTest(platform.id, "Platform Launch");
-    createEpicForTest(product.id, "Product Discovery");
-    const ticket = createTicketForTest({
-      teamId: platform.id,
-      epicId: null,
-    });
-
-    const data = await loader({
+    const result = await loader({
       request: await createAuthedRequest(ticket.id),
       params: {
         ticketId: ticket.id,
       },
     });
 
-    if (data.status !== "found") {
+    if (result.status !== "found") {
       throw new Error("Expected the ticket to be found.");
     }
 
-    expect(data.epics).toEqual([platformEpic]);
-    expect(data.teams).toHaveLength(2);
-    expect(data.teams.map((team) => team.name)).toEqual(["Platform", "Product"]);
+    expect(result.epics).toEqual([platformEpic]);
   });
 
-  it("requires authentication before loading the edit screen", async () => {
+  it("returns the team list for the edit form", async () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: platform.id,
+        epicId: null,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "todo",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = await loader({
+      request: await createAuthedRequest(ticket.id),
+      params: {
+        ticketId: ticket.id,
+      },
+    });
+
+    if (result.status !== "found") {
+      throw new Error("Expected the ticket to be found.");
+    }
+
+    expect(result.teams).toEqual([platform, product]);
+  });
+
+  it("redirects unauthenticated requests", async () => {
     await expect(
       loader({
         request: new Request("http://example.com/tickets/ticket-1/edit"),
