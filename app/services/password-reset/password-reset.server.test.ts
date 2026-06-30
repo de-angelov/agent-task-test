@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword, type AuthDb } from "../auth/auth.server";
 import {
   requestPasswordReset,
   resetPasswordWithToken,
+  validatePasswordResetToken,
   type PasswordResetEmailSender,
 } from "./password-reset.server";
 
@@ -102,6 +103,12 @@ describe("password reset service", () => {
     const storedToken = db.select().from(schema.passwordResetTokens).get();
 
     expect(storedToken?.tokenHash).not.toBe(token);
+    expect(
+      validatePasswordResetToken(
+        { token },
+        { db, now: () => new Date("2026-06-28T00:00:30.000Z") },
+      )._unsafeUnwrap(),
+    ).toEqual({ email: "member@example.com" });
 
     const reset = await resetPasswordWithToken(
       { token, password: "new-password" },

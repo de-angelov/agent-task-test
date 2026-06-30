@@ -1,6 +1,10 @@
 import { useLoaderData } from "react-router";
 
+import { db } from "~/db/client.server";
+import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
+import { listTicketsForTeam, type TicketReadModel } from "~/services/tickets/tickets.server";
+import { listTeams, type Team } from "~/services/teams/teams.server";
 
 import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
 
@@ -22,17 +26,50 @@ const cards = [
   { title: "Review blocked deletion message", type: "bug", state: "Done" },
 ];
 
+type LoaderData = {
+  teams: Team[];
+  selectedTeamId: string;
+  epics: Epic[];
+  tickets: TicketReadModel[];
+  userEmail: string;
+};
+
 export function meta() {
   return [{ title: "Kanban Board" }];
 }
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireAuthenticatedUser(request);
+  const teams = listTeams(db);
+  const requestedTeamId = new URL(request.url).searchParams.get("teamId") ?? "";
+  const selectedTeam = teams.find((team) => team.id === requestedTeamId);
+  const selectedTeamId = selectedTeam?.id ?? teams[0]?.id ?? "";
 
-  return { status: "placeholder-board", userEmail: user.email };
+  if (selectedTeamId === "") {
+    return {
+      teams,
+      selectedTeamId,
+      epics: [],
+      tickets: [],
+      userEmail: user.email,
+    } satisfies LoaderData;
+  }
+
+  return {
+    teams,
+    selectedTeamId,
+    epics: listEpics(db, { teamId: selectedTeamId }),
+    tickets: listTicketsForTeam(db, { teamId: selectedTeamId }),
+    userEmail: user.email,
+  } satisfies LoaderData;
 }
 
-export function BoardView({ userEmail = "user@example.com" }: { userEmail?: string }) {
+export function BoardView({
+  epics = [],
+  selectedTeamId = "",
+  teams = [],
+  userEmail = "user@example.com",
+}: Partial<LoaderData> = {}) {
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
       <PlaceholderNotice>
@@ -42,9 +79,13 @@ export function BoardView({ userEmail = "user@example.com" }: { userEmail?: stri
       <section className="toolbar" aria-label="Board filters">
         <label className="form-field">
           <span>Team</span>
-          <select name="team">
-            <option>Platform</option>
-            <option>Product</option>
+          <select defaultValue={selectedTeamId} name="team">
+            {teams.length === 0 ? <option value="">No teams available</option> : null}
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="form-field">
@@ -60,7 +101,11 @@ export function BoardView({ userEmail = "user@example.com" }: { userEmail?: stri
           <span>Epic</span>
           <select name="epic">
             <option>All epics</option>
-            <option>Authentication</option>
+            {epics.map((epic) => (
+              <option key={epic.id} value={epic.id}>
+                {epic.title}
+              </option>
+            ))}
           </select>
         </label>
         <label className="form-field">
@@ -94,5 +139,5 @@ export function BoardView({ userEmail = "user@example.com" }: { userEmail?: stri
 export default function Board() {
   const data = useLoaderData<typeof loader>();
 
-  return <BoardView userEmail={data.userEmail} />;
+  return <BoardView {...data} />;
 }

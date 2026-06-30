@@ -5,6 +5,8 @@ export default [
   index("routes/home/home.tsx"),
   route("signup", "routes/auth/signup.tsx"),
   route("login", "routes/auth/login.tsx"),
+  route("forgot-password", "routes/auth/forgot-password.tsx"),
+  route("reset-password", "routes/auth/reset-password.tsx"),
   route("logout", "routes/auth/logout.tsx"),
   route("verify-email", "routes/auth/verify-email.tsx"),
   route("resend-verification", "routes/auth/resend-verification.tsx"),
