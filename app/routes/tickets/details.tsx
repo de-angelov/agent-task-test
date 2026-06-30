@@ -28,10 +28,10 @@ export async function loader({ request, params }: LoaderArgs) {
 
 function getStateLabel(state: TicketReadModel["state"]) {
   return match(state)
-    .with("backlog", () => "backlog")
-    .with("todo", () => "todo")
-    .with("in-progress", () => "in-progress")
-    .with("done", () => "done")
+    .with("backlog", () => "Backlog")
+    .with("todo", () => "Todo")
+    .with("in-progress", () => "In progress")
+    .with("done", () => "Done")
     .exhaustive();
 }
 
@@ -52,11 +52,11 @@ function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
       <dd>{getStateLabel(ticket.state)}</dd>
       <dt>Created by</dt>
       <dd>{ticket.createdByEmail}</dd>
-      <dt>Created at</dt>
+      <dt>Created timestamp</dt>
       <dd>
         <time dateTime={ticket.createdAt}>{ticket.createdAt}</time>
       </dd>
-      <dt>Modified at</dt>
+      <dt>Modified timestamp</dt>
       <dd>
         <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
       </dd>
