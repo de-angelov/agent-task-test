@@ -59,7 +59,16 @@ describe("minimum placeholder routes", () => {
         data={{ status: "not-found", ticketId: "TICKET-1" }}
       />,
     );
-    const edit = renderToString(<TicketEditView ticketId="TICKET-1" />);
+    const edit = renderToString(
+      <TicketEditView
+        data={{
+          status: "not-found",
+          ticketId: "TICKET-1",
+          teams: [],
+          userEmail: "user@example.com",
+        }}
+      />,
+    );
 
     expect(board).toContain("Ready for implementation");
     expect(board).toContain("Create ticket");
@@ -67,7 +76,7 @@ describe("minimum placeholder routes", () => {
     expect(board).toContain("Log out");
     expect(create).toContain("Ticket details");
     expect(details).toContain("Ticket TICKET-1 was not found.");
-    expect(edit).toContain("Editing ticket TICKET-1");
+    expect(edit).toContain("Ticket TICKET-1 was not found.");
   });
 
   it("keeps authenticated navigation off public authentication screens", () => {
