@@ -28,6 +28,11 @@ export type ResetPasswordError =
   | "token-already-used"
   | "password-too-short";
 
+export type PasswordResetTokenError =
+  | "invalid-token"
+  | "expired-token"
+  | "token-already-used";
+
 type PasswordResetServiceDependencies = {
   db: AuthDb;
   emailSender: PasswordResetEmailSender;
@@ -130,12 +135,54 @@ export async function resetPasswordWithToken(
   return ok({ email: user.email });
 }
 
+export function verifyPasswordResetToken(
+  input: { token: string },
+  dependencies: ResetPasswordDependencies,
+): Result<{ token: string }, PasswordResetTokenError> {
+  const resetToken = findUsablePasswordResetToken(input.token, dependencies);
+  if (resetToken.isErr()) {
+    return err(resetToken.error);
+  }
+
+  return ok({ token: input.token });
+}
+
 function findUserByEmail(db: AuthDb, email: string): User | undefined {
   return db
     .select()
     .from(schema.users)
     .where(eq(schema.users.email, email))
     .get();
+}
+
+function findUsablePasswordResetToken(
+  token: string,
+  dependencies: ResetPasswordDependencies,
+): Result<
+  typeof schema.passwordResetTokens.$inferSelect,
+  PasswordResetTokenError
+> {
+  const now = dependencies.now?.() ?? new Date();
+  const tokenHash = hashToken(token);
+  const resetToken = dependencies.db
+    .select()
+    .from(schema.passwordResetTokens)
+    .where(eq(schema.passwordResetTokens.tokenHash, tokenHash))
+    .get();
+
+  if (resetToken === undefined || resetToken.invalidatedAt !== null) {
+    return err("invalid-token");
+  }
+
+  if (resetToken.usedAt !== null) {
+    return err("token-already-used");
+  }
+
+  if (resetToken.expiresAt <= now.getTime()) {
+    return err("expired-token");
+  }
+
+  return ok(resetToken);
 }
 
 function issuePasswordResetToken(
