@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "~/db/schema";
 import { createEpic } from "~/services/epics/epics.server";
 import { createTicket } from "~/services/tickets/tickets.server";
-import { type TicketState } from "~/services/tickets/ticket-workflow";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
+import { createSessionCookie } from "~/services/session/session.server";
 
 import { loader, TicketDetailsView } from "./details";
 
@@ -131,10 +131,12 @@ beforeEach(() => {
     .run();
 });
 
-function createAuthedRequest(ticketId?: string) {
+async function createAuthedRequest(ticketId?: string) {
+  const cookie = await createSessionCookie(sessionId);
+
   return new Request(`http://example.com/tickets/${ticketId ?? ""}`, {
     headers: {
-      Cookie: `project_tracker_session=${sessionId}`,
+      Cookie: cookie,
     },
   });
 }
@@ -183,7 +185,7 @@ describe("ticket details route", () => {
 
     await expect(
       loader({
-        request: createAuthedRequest(ticket.id),
+        request: await createAuthedRequest(ticket.id),
         params: {
           ticketId: ticket.id,
         },
@@ -225,12 +227,10 @@ describe("ticket details route", () => {
     expect(html).toContain("<dt>Team</dt><dd>Platform</dd>");
     expect(html).toContain("<dt>Epic</dt><dd>Launch Plan</dd>");
     expect(html).toContain("<dt>Created by</dt><dd>user@example.com</dd>");
-    expect(html).toContain(
-      "<dt>Created timestamp</dt><dd>2026-06-30T10:00:00.000Z</dd>",
-    );
-    expect(html).toContain(
-      "<dt>Modified timestamp</dt><dd>2026-06-30T10:30:00.000Z</dd>",
-    );
+    expect(html).toContain("<dt>Created timestamp</dt><dd><time");
+    expect(html).toContain("2026-06-30T10:00:00.000Z</time></dd>");
+    expect(html).toContain("<dt>Modified timestamp</dt><dd><time");
+    expect(html).toContain("2026-06-30T10:30:00.000Z</time></dd>");
     expect(html).toContain('href="/tickets/ticket-1/edit"');
     expect(html.match(/href="\/tickets\/ticket-1\/edit"/g)).toHaveLength(1);
   });
@@ -292,14 +292,16 @@ describe("ticket details route", () => {
       ticketId: "missing-ticket",
     });
 
-    expect(html).toContain("Ticket missing-ticket was not found.");
+    expect(html).toContain("Ticket");
+    expect(html).toContain("missing-ticket");
+    expect(html).toContain("was not found.");
     expect(html).not.toContain('/tickets/missing-ticket/edit');
   });
 
   it("returns not-found for unknown ticket ids after authentication", async () => {
     await expect(
       loader({
-        request: createAuthedRequest("missing-ticket"),
+        request: await createAuthedRequest("missing-ticket"),
         params: {
           ticketId: "missing-ticket",
         },
