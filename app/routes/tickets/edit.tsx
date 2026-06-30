@@ -1,12 +1,17 @@
 import { useLoaderData } from "react-router";
+import { match } from "ts-pattern";
 
+import { db } from "~/db/client.server";
+import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
-
+import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 import {
-  PlaceholderForm,
-  PlaceholderNotice,
-  ScreenShell,
-} from "../placeholders/placeholder-ui";
+  getTicketById,
+  type TicketReadModel,
+} from "~/services/tickets/tickets.server";
+import { listTeams, type Team } from "~/services/teams/teams.server";
+
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;
@@ -19,13 +24,45 @@ export function meta() {
   return [{ title: "Edit Ticket" }];
 }
 
+export type TicketEditFound = {
+  status: "found";
+  userEmail: string;
+  ticket: TicketReadModel;
+  teams: Team[];
+  epics: Epic[];
+};
+
+export type TicketEditNotFound = {
+  status: "not-found";
+  userEmail: string;
+  ticketId: string;
+  teams: Team[];
+};
+
+export type LoaderData = TicketEditFound | TicketEditNotFound;
+
 export async function loader({ request, params }: LoaderArgs) {
-  await requireAuthenticatedUser(request);
+  const user = await requireAuthenticatedUser(request);
+  const teams = listTeams(db);
+  const ticketId = params.ticketId ?? "";
+  const ticket = getTicketById(db, { id: ticketId });
+
+  if (ticket.isErr()) {
+    return {
+      status: "not-found",
+      ticketId,
+      teams,
+      userEmail: user.email,
+    } satisfies TicketEditNotFound;
+  }
 
   return {
-    status: "placeholder-ticket-edit",
-    ticketId: params.ticketId ?? "placeholder",
-  };
+    status: "found",
+    ticket: ticket.value,
+    teams,
+    epics: listEpics(db, { teamId: ticket.value.teamId }),
+    userEmail: user.email,
+  } satisfies TicketEditFound;
 }
 
 export async function action({ request }: { request: Request }) {
@@ -34,28 +71,100 @@ export async function action({ request }: { request: Request }) {
   return { status: "placeholder-ticket-update" };
 }
 
-export function TicketEditView({ ticketId = "placeholder" }: { ticketId?: string }) {
-  const notice = `Editing ticket ${ticketId}. Saving unchanged values and same-team epic validation will be handled by later services.`;
+function getStateLabel(state: TicketReadModel["state"]) {
+  return match(state)
+    .with("backlog", () => "Backlog")
+    .with("todo", () => "Todo")
+    .with("in-progress", () => "In progress")
+    .with("done", () => "Done")
+    .exhaustive();
+}
 
+function TicketEditForm({ data }: { data: TicketEditFound }) {
   return (
-    <ScreenShell title="Edit ticket">
-      <PlaceholderNotice>{notice}</PlaceholderNotice>
-      <PlaceholderForm
-        actionLabel="Save ticket"
-        fields={[
-          { label: "Title", name: "title", value: "Set up account verification" },
-          { label: "Team", name: "team", value: "Platform" },
-          { label: "Epic", name: "epic", value: "Authentication" },
-          { label: "Type", name: "type", value: "feature" },
-          { label: "State", name: "state", value: "new" },
-        ]}
-        title="Editable fields"
-      >
-        <label className="form-field">
-          <span>Body</span>
-          <textarea defaultValue="Placeholder ticket body" name="body" rows={6} />
-        </label>
-      </PlaceholderForm>
+    <form className="form-panel" method="post">
+      <h2>Ticket details</h2>
+      <label className="form-field">
+        <span>Team</span>
+        <select defaultValue={data.ticket.teamId} name="teamId">
+          {data.teams.map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="form-field">
+        <span>Epic</span>
+        <select defaultValue={data.ticket.epicId ?? ""} name="epicId">
+          <option value="">No epic</option>
+          {data.epics.map((epic) => (
+            <option key={epic.id} value={epic.id}>
+              {epic.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="form-field">
+        <span>Type</span>
+        <select defaultValue={data.ticket.type} name="type">
+          {ticketTypes.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="form-field">
+        <span>State</span>
+        <select defaultValue={data.ticket.state} name="state">
+          {ticketStates.map((state) => (
+            <option key={state} value={state}>
+              {state}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="form-field">
+        <span>Title</span>
+        <input defaultValue={data.ticket.title} name="title" />
+      </label>
+      <label className="form-field">
+        <span>Body</span>
+        <textarea defaultValue={data.ticket.body} name="body" rows={6} />
+      </label>
+      <button type="submit">Save ticket</button>
+    </form>
+  );
+}
+
+export function TicketEditView({ data }: { data: LoaderData }) {
+  return (
+    <ScreenShell title="Edit ticket" userEmail={data.userEmail}>
+      {data.status === "found" ? (
+        <>
+          <dl className="details-list">
+            <dt>Title</dt>
+            <dd>{data.ticket.title}</dd>
+            <dt>Body</dt>
+            <dd>{data.ticket.body}</dd>
+            <dt>Type</dt>
+            <dd>{data.ticket.type}</dd>
+            <dt>Team</dt>
+            <dd>
+              {data.teams.find((team) => team.id === data.ticket.teamId)?.name ??
+                data.ticket.teamId}
+            </dd>
+            <dt>Epic</dt>
+            <dd>{data.ticket.epicTitle ?? "No epic"}</dd>
+            <dt>State</dt>
+            <dd>{getStateLabel(data.ticket.state)}</dd>
+          </dl>
+          <TicketEditForm data={data} />
+        </>
+      ) : (
+        <p role="status">Ticket {data.ticketId} was not found.</p>
+      )}
     </ScreenShell>
   );
 }
@@ -63,5 +172,5 @@ export function TicketEditView({ ticketId = "placeholder" }: { ticketId?: string
 export default function TicketEdit() {
   const data = useLoaderData<typeof loader>();
 
-  return <TicketEditView ticketId={data.ticketId} />;
+  return <TicketEditView data={data} />;
 }
