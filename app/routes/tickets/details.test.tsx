@@ -1,26 +1,42 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { renderToString } from "react-dom/server";
-import { beforeEach, describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
 import { createEpic } from "~/services/epics/epics.server";
 import { createTicket } from "~/services/tickets/tickets.server";
+import { type TicketState } from "~/services/tickets/ticket-workflow";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 
 import { loader, TicketDetailsView } from "./details";
-import { readTicketDetails } from "./details.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
+const userId = "user-1";
+const sessionId = "session-1";
 
 let sqlite: Database.Database;
 let database: AppDb;
 
+const clientServerState = vi.hoisted(() => ({
+  db: undefined as AppDb | undefined,
+}));
+
+vi.mock("~/db/client.server", () => ({
+  get db() {
+    if (!clientServerState.db) {
+      throw new Error("Test database has not been initialized.");
+    }
+
+    return clientServerState.db;
+  },
+}));
+
 beforeEach(() => {
   sqlite = new Database(":memory:");
+  sqlite.pragma("foreign_keys = ON");
   sqlite.exec(`
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE teams (
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
@@ -63,19 +79,73 @@ beforeEach(() => {
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
-    CREATE TABLE sessions (
+    CREATE TABLE email_verification_tokens (
       id text PRIMARY KEY NOT NULL,
-      user_id text NOT NULL,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE cascade,
+      token_hash text NOT NULL UNIQUE,
       expires_at integer NOT NULL,
-      created_at integer NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+      used_at integer,
+      invalidated_at integer,
+      created_at integer NOT NULL
     );
 
-    INSERT INTO users (id, email, password_hash, email_verified_at, created_at)
-    VALUES ('user-1', 'user@example.com', 'hash', ${now.getTime()}, ${now.getTime()});
+    CREATE TABLE password_reset_tokens (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE cascade,
+      token_hash text NOT NULL UNIQUE,
+      expires_at integer NOT NULL,
+      used_at integer,
+      invalidated_at integer,
+      created_at integer NOT NULL
+    );
+
+    CREATE TABLE sessions (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE cascade,
+      expires_at integer NOT NULL,
+      created_at integer NOT NULL
+    );
   `);
+
   database = drizzle(sqlite, { schema });
+  clientServerState.db = database;
+
+  database
+    .insert(schema.users)
+    .values({
+      id: userId,
+      email: "user@example.com",
+      passwordHash: "hash",
+      emailVerifiedAt: now.getTime(),
+      createdAt: now.getTime(),
+    })
+    .run();
+  database
+    .insert(schema.sessions)
+    .values({
+      id: sessionId,
+      userId,
+      expiresAt: now.getTime() + 7 * 24 * 60 * 60 * 1000,
+      createdAt: now.getTime(),
+    })
+    .run();
 });
+
+function createAuthedRequest(ticketId?: string) {
+  return new Request(`http://example.com/tickets/${ticketId ?? ""}`, {
+    headers: {
+      Cookie: `project_tracker_session=${sessionId}`,
+    },
+  });
+}
+
+function renderDetails(data: Parameters<typeof TicketDetailsView>[0]["data"]) {
+  return renderToString(
+    <MemoryRouter>
+      <TicketDetailsView data={data} />
+    </MemoryRouter>,
+  );
+}
 
 function createTeamForTest(name = "Platform") {
   return createTeam(database, { name }, { now: () => now })._unsafeUnwrap();
@@ -93,102 +163,163 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
   )._unsafeUnwrap();
 }
 
-function createTicketForTest(input: {
-  teamId: string;
-  epicId?: string | null;
-  state: "backlog" | "todo" | "in-progress" | "done";
-}) {
-  return createTicket(
-    database,
-    {
-      teamId: input.teamId,
-      epicId: input.epicId ?? null,
-      createdBy: "user-1",
-      title: "Create service",
-      body: "Create a focused backend service",
-      type: "feature",
-      state: input.state,
-    },
-    { now: () => now },
-  )._unsafeUnwrap();
-}
-
 describe("ticket details route", () => {
-  it("renders the ticket fields, state labels, null epic text, and edit navigation", () => {
+  it("loads ticket details for an authenticated request", async () => {
     const team = createTeamForTest();
     const epic = createEpicForTest(team.id);
-    const ticket = createTicketForTest({
-      teamId: team.id,
-      epicId: epic.id,
-      state: "in-progress",
-    });
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        epicId: epic.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
 
-    const html = renderToString(
-      <TicketDetailsView data={readTicketDetails(database, ticket.id)} />,
-    );
+    await expect(
+      loader({
+        request: createAuthedRequest(ticket.id),
+        params: {
+          ticketId: ticket.id,
+        },
+      }),
+    ).resolves.toEqual({
+      status: "found",
+      ticket: {
+        ...ticket,
+        teamName: "Platform",
+        epicTitle: "Launch Plan",
+        createdByEmail: "user@example.com",
+      },
+    });
+  });
+
+  it("renders ticket fields and the edit navigation link", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: "epic-1",
+        epicTitle: "Launch Plan",
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+    });
 
     expect(html).toContain("Create service");
     expect(html).toContain("Create a focused backend service");
-    expect(html).toContain("feature");
-    expect(html).toContain("Platform");
-    expect(html).toContain("Launch Plan");
-    expect(html).toContain("in-progress");
-    expect(html).toContain("user@example.com");
-    expect(html).toContain(ticket.createdAt);
-    expect(html).toContain(ticket.modifiedAt);
-    expect(html).toContain(`href="/tickets/${ticket.id}/edit"`);
-    expect(
-      html.match(new RegExp(`/tickets/${ticket.id}/edit`, "g")) ?? [],
-    ).toHaveLength(1);
+    expect(html).toContain("<dt>Type</dt><dd>feature</dd>");
+    expect(html).toContain("<dt>Team</dt><dd>Platform</dd>");
+    expect(html).toContain("<dt>Epic</dt><dd>Launch Plan</dd>");
+    expect(html).toContain("<dt>Created by</dt><dd>user@example.com</dd>");
+    expect(html).toContain(
+      "<dt>Created timestamp</dt><dd>2026-06-30T10:00:00.000Z</dd>",
+    );
+    expect(html).toContain(
+      "<dt>Modified timestamp</dt><dd>2026-06-30T10:30:00.000Z</dd>",
+    );
+    expect(html).toContain('href="/tickets/ticket-1/edit"');
+    expect(html.match(/href="\/tickets\/ticket-1\/edit"/g)).toHaveLength(1);
   });
 
-  it("renders the state labels for all current ticket states", () => {
-    const team = createTeamForTest();
+  it("renders No epic when the ticket has no epic", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "todo",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+    });
 
-    const tickets = [
-      createTicketForTest({ teamId: team.id, state: "backlog" }),
-      createTicketForTest({ teamId: team.id, state: "todo" }),
-      createTicketForTest({ teamId: team.id, state: "in-progress" }),
-      createTicketForTest({ teamId: team.id, state: "done" }),
-    ];
-
-    const html = tickets
-      .map((ticket) =>
-        renderToString(
-          <TicketDetailsView data={readTicketDetails(database, ticket.id)} />,
-        ),
-      )
-      .join("\n");
-
-    expect(html).toContain("backlog");
-    expect(html).toContain("todo");
-    expect(html).toContain("in-progress");
-    expect(html).toContain("done");
+    expect(html).toContain("<dt>Epic</dt><dd>No epic</dd>");
   });
 
-  it("renders the missing ticket message when the ticket id is unknown", () => {
-    const loaderData = readTicketDetails(database, "missing-ticket");
+  it.each([
+    ["backlog", "Backlog"],
+    ["todo", "Todo"],
+    ["in-progress", "In progress"],
+    ["done", "Done"],
+] as const)("maps %s to %s", (state, label) => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state,
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+    });
 
-    expect(loaderData).toEqual({
+    expect(html).toContain(`<dt>State</dt><dd>${label}</dd>`);
+  });
+
+  it("renders a not-found message for missing ticket ids", () => {
+    const html = renderDetails({
       status: "not-found",
       ticketId: "missing-ticket",
     });
 
-    const html = renderToString(<TicketDetailsView data={loaderData} />);
-
-    expect(html).toContain("Ticket");
-    expect(html).toContain("missing-ticket");
-    expect(html).toContain("was not found.");
-    expect(html).not.toContain("Edit ticket");
+    expect(html).toContain("Ticket missing-ticket was not found.");
+    expect(html).not.toContain('/tickets/missing-ticket/edit');
   });
 
-  it("requires authentication before loading ticket details", async () => {
-    const request = new Request("http://example.com/tickets/ticket-1");
+  it("returns not-found for unknown ticket ids after authentication", async () => {
+    await expect(
+      loader({
+        request: createAuthedRequest("missing-ticket"),
+        params: {
+          ticketId: "missing-ticket",
+        },
+      }),
+    ).resolves.toEqual({
+      status: "not-found",
+      ticketId: "missing-ticket",
+    });
+  });
 
-    await expect(loader({ request, params: { ticketId: "ticket-1" } })).rejects.toMatchObject(
-      {
-        status: 302,
-      },
-    );
+  it("requires authentication before reading details", async () => {
+    await expect(
+      loader({
+        request: new Request("http://example.com/tickets/ticket-1"),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
   });
 });
