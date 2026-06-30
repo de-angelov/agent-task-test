@@ -4,13 +4,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "~/db/schema";
 
-import { createEpic } from "../epics/epics.server";
-import { createTeam, type AppDb } from "../teams/teams.server";
+import { createEpic, deleteEpic } from "../epics/epics.server";
+import { createTeam, deleteTeam, type AppDb } from "../teams/teams.server";
 import {
   createTicket,
+  deleteTicket,
   getTicketById,
   listTicketsForTeam,
   mapTicketCreateError,
+  mapTicketDeleteError,
   mapTicketUpdateError,
   normalizeTicketBody,
   normalizeTicketTitle,
@@ -426,6 +428,77 @@ describe("ticket service", () => {
     ).toEqual(["Newest", "Middle", "Oldest"]);
   });
 
+  it("deletes tickets by id", () => {
+    const team = createTeamForTest();
+    const deletedTicket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Delete service",
+        body: "Remove a persisted ticket",
+        type: "task",
+        state: "todo",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+    const retainedTicket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: "user-1",
+        title: "Retain service",
+        body: "Leave unrelated tickets alone",
+        type: "task",
+        state: "todo",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(deleteTicket(database, { id: deletedTicket.id }).isOk()).toBe(true);
+
+    expect(database.select().from(schema.tickets).all()).toEqual([retainedTicket]);
+    expect(
+      getTicketById(database, { id: deletedTicket.id })._unsafeUnwrapErr(),
+    ).toBe("not-found");
+  });
+
+  it("returns not-found when deleting a missing ticket", () => {
+    expect(deleteTicket(database, { id: "missing-ticket" })._unsafeUnwrapErr()).toBe(
+      "not-found",
+    );
+  });
+
+  it("preserves team and epic blocked-delete behavior until referenced tickets are deleted", () => {
+    const team = createTeamForTest();
+    const epic = createEpicForTest(team.id);
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        epicId: epic.id,
+        createdBy: "user-1",
+        title: "Referenced ticket",
+        body: "Keep parent deletes blocked while this exists",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(deleteTeam(database, { id: team.id })._unsafeUnwrapErr()).toBe(
+      "blocked-by-tickets",
+    );
+    expect(deleteEpic(database, { id: epic.id })._unsafeUnwrapErr()).toBe(
+      "blocked-by-tickets",
+    );
+
+    expect(deleteTicket(database, { id: ticket.id }).isOk()).toBe(true);
+
+    expect(deleteEpic(database, { id: epic.id }).isOk()).toBe(true);
+    expect(deleteTeam(database, { id: team.id }).isOk()).toBe(true);
+  });
+
   it("updates editable ticket fields and advances modified-at when values change", () => {
     const platform = createTeamForTest("Platform");
     const product = createTeamForTest("Product");
@@ -705,5 +778,9 @@ describe("ticket service", () => {
       "Epic must belong to the ticket team.",
     );
     expect(mapTicketUpdateError("not-found")).toBe("Ticket not found.");
+  });
+
+  it("maps delete errors to user-facing messages", () => {
+    expect(mapTicketDeleteError("not-found")).toBe("Ticket not found.");
   });
 });
