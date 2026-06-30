@@ -4,16 +4,8 @@ import { Button } from "~/components/button";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 
-import {
-  readTicketEdit,
-  type LoaderData,
-  type TicketEditFound,
-} from "./edit.server";
-import {
-  PlaceholderForm,
-  PlaceholderNotice,
-  ScreenShell,
-} from "../placeholders/placeholder-ui";
+import { readTicketEdit, type LoaderData, type TicketEditFound } from "./edit.server";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;
@@ -99,39 +91,9 @@ function TicketEditForm({ data }: { data: TicketEditFound }) {
 
 export function TicketEditView({
   data,
-  ticketId = "placeholder",
 }: {
-  data?: LoaderData;
-  ticketId?: string;
+  data: LoaderData;
 }) {
-  if (!data) {
-    return (
-      <ScreenShell title="Edit ticket">
-        <PlaceholderNotice>{`Editing ticket ${ticketId}. Saving unchanged values and same-team epic validation will be handled by later services.`}</PlaceholderNotice>
-        <PlaceholderForm
-          actionLabel="Save ticket"
-          fields={[
-            {
-              label: "Title",
-              name: "title",
-              value: "Set up account verification",
-            },
-            { label: "Team", name: "team", value: "Platform" },
-            { label: "Epic", name: "epic", value: "Authentication" },
-            { label: "Type", name: "type", value: "feature" },
-            { label: "State", name: "state", value: "new" },
-          ]}
-          title="Editable fields"
-        >
-          <label className="form-field">
-            <span>Body</span>
-            <textarea defaultValue="Placeholder ticket body" name="body" rows={6} />
-          </label>
-        </PlaceholderForm>
-      </ScreenShell>
-    );
-  }
-
   return (
     <ScreenShell title="Edit ticket" userEmail={data.userEmail}>
       {data.status === "found" ? (
