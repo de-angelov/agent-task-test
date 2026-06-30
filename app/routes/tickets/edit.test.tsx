@@ -5,14 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
 import { createEpic } from "~/services/epics/epics.server";
+import { createSessionCookie } from "~/services/session/session.server";
 import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
-import { createSessionCookie } from "~/services/session/session.server";
 
 import { loader, TicketEditView } from "./edit";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 const userId = "user-1";
+const userEmail = "user@example.com";
 const sessionId = "session-1";
 
 let sqlite: Database.Database;
@@ -113,7 +114,7 @@ beforeEach(() => {
     .insert(schema.users)
     .values({
       id: userId,
-      email: "user@example.com",
+      email: userEmail,
       passwordHash: "hash",
       emailVerifiedAt: now.getTime(),
       createdAt: now.getTime(),
@@ -157,7 +158,7 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
 }
 
 describe("ticket edit route", () => {
-  it("loads the ticket, team list, and team-scoped epics for an authenticated request", async () => {
+  it("loads ticket data, teams, and selected-team epics for an authenticated request", async () => {
     const platform = createTeamForTest("Platform");
     const product = createTeamForTest("Product");
     const platformEpic = createEpicForTest(platform.id, "Platform Launch");
@@ -188,62 +189,21 @@ describe("ticket edit route", () => {
       ticket: {
         ...ticket,
         teamName: "Platform",
-        epicTitle: "Launch Plan",
-        createdByEmail: "user@example.com",
+        epicTitle: "Platform Launch",
+        createdByEmail: userEmail,
       },
-      teams: [
-        {
-          id: platform.id,
-          name: "Platform",
-          normalizedName: "platform",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-        {
-          id: product.id,
-          name: "Product",
-          normalizedName: "product",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-      ],
-      epics: [
-        {
-          id: platformEpic.id,
-          teamId: platform.id,
-          title: "Launch Plan",
-          description: "Coordinate the MVP launch",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-      ],
-      selectedTeamId: platform.id,
-      userEmail: "user@example.com",
+      teams: [platform, product],
+      epics: [platformEpic],
+      userEmail,
     });
   });
 
-  it("returns not-found for missing tickets", async () => {
-    await expect(
-      loader({
-        request: await createAuthedRequest("missing-ticket"),
-        params: {
-          ticketId: "missing-ticket",
-        },
-      }),
-    ).resolves.toEqual({
-      status: "not-found",
-      ticketId: "missing-ticket",
-      userEmail: "user@example.com",
-    });
-  });
-
-  it("renders the loaded ticket edit form fields", () => {
+  it("renders the edit form with the current ticket values", () => {
     const html = renderToString(
       <TicketEditView
         data={{
           status: "found",
-          userEmail: "user@example.com",
-          selectedTeamId: "team-1",
+          userEmail,
           ticket: {
             id: "ticket-1",
             title: "Create service",
@@ -255,7 +215,7 @@ describe("ticket edit route", () => {
             epicId: "epic-1",
             epicTitle: "Launch Plan",
             createdBy: userId,
-            createdByEmail: "user@example.com",
+            createdByEmail: userEmail,
             createdAt: "2026-06-30T10:00:00.000Z",
             modifiedAt: "2026-06-30T10:30:00.000Z",
           },
@@ -273,7 +233,7 @@ describe("ticket edit route", () => {
               id: "epic-1",
               teamId: "team-1",
               title: "Launch Plan",
-              description: "Coordinate the MVP launch",
+              description: null,
               createdAt: "2026-06-30T10:00:00.000Z",
               updatedAt: "2026-06-30T10:00:00.000Z",
             },
@@ -283,6 +243,8 @@ describe("ticket edit route", () => {
     );
 
     expect(html).toContain("Edit ticket");
+    expect(html).toContain("Create service");
+    expect(html).toContain("Create a focused backend service");
     expect(html).toContain('name="teamId"');
     expect(html).toContain('name="epicId"');
     expect(html).toContain('name="type"');
@@ -294,9 +256,50 @@ describe("ticket edit route", () => {
     expect(html).toContain("Save ticket");
   });
 
-  it("redirects unauthenticated users away from the edit route", async () => {
+  it("renders a not-found message for missing tickets", () => {
+    const html = renderToString(
+      <TicketEditView
+        data={{
+          status: "not-found",
+          ticketId: "missing-ticket",
+          teams: [],
+          userEmail,
+        }}
+      />,
+    );
+
+    expect(html).toContain("Ticket");
+    expect(html).toContain("missing-ticket");
+    expect(html).toContain("was not found.");
+    expect(html).not.toContain("Save ticket");
+  });
+
+  it("returns not-found for unknown ticket ids after authentication", async () => {
+    const team = createTeamForTest();
+
     await expect(
-      loader({ request: new Request("http://example.com/tickets/ticket-1/edit"), params: {} }),
+      loader({
+        request: await createAuthedRequest("missing-ticket"),
+        params: {
+          ticketId: "missing-ticket",
+        },
+      }),
+    ).resolves.toEqual({
+      status: "not-found",
+      ticketId: "missing-ticket",
+      teams: [team],
+      userEmail,
+    });
+  });
+
+  it("requires authentication before reading the edit screen", async () => {
+    await expect(
+      loader({
+        request: new Request("http://example.com/tickets/ticket-1/edit"),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
     ).rejects.toMatchObject({
       status: 302,
     });
