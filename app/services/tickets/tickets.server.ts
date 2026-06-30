@@ -16,7 +16,7 @@ import {
   ticketTypes,
   type TicketState,
   type TicketType,
-} from "./ticket-workflow.server";
+} from "./ticket-workflow";
 
 export interface Ticket {
   id: string;
