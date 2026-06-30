@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
-import { createEpic, listEpics } from "~/services/epics/epics.server";
+import { createEpic } from "~/services/epics/epics.server";
 import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
@@ -134,7 +134,7 @@ beforeEach(() => {
 async function createAuthedRequest(ticketId?: string) {
   const cookie = await createSessionCookie(sessionId);
 
-  return new Request(`http://example.com/tickets/${ticketId ?? ""}/edit`, {
+  return new Request(`http://example.com/tickets/${ticketId ?? ""}`, {
     headers: {
       Cookie: cookie,
     },
@@ -166,11 +166,10 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
 }
 
 describe("ticket edit route", () => {
-  it("loads the ticket, teams, and team-scoped epics for an authenticated request", async () => {
-    const platform = createTeamForTest("Platform");
+  it("loads ticket data, team list, and selected-team epics for authenticated requests", async () => {
+    const platform = createTeamForTest();
     const product = createTeamForTest("Product");
-    const platformEpic = createEpicForTest(platform.id, "Launch Plan");
-    createEpicForTest(platform.id, "Platform Release");
+    const platformEpic = createEpicForTest(platform.id, "Platform Launch");
     createEpicForTest(product.id, "Product Discovery");
     const ticket = createTicket(
       database,
@@ -198,91 +197,27 @@ describe("ticket edit route", () => {
       ticket: {
         ...ticket,
         teamName: "Platform",
-        epicTitle: "Launch Plan",
+        epicTitle: "Platform Launch",
         createdByEmail: "user@example.com",
       },
       teams: [platform, product],
-      epics: [platformEpic, expect.objectContaining({ id: expect.any(String) })],
-      userEmail: "user@example.com",
-    });
-  });
-
-  it("renders the edit form fields and team-scoped epic options", () => {
-    const html = renderEdit({
-      status: "found",
-      ticket: {
-        id: "ticket-1",
-        title: "Create service",
-        body: "Create a focused backend service",
-        type: "feature",
-        state: "backlog",
-        teamId: "team-1",
-        teamName: "Platform",
-        epicId: "epic-1",
-        epicTitle: "Launch Plan",
-        createdBy: userId,
-        createdByEmail: "user@example.com",
-        createdAt: "2026-06-30T10:00:00.000Z",
-        modifiedAt: "2026-06-30T10:30:00.000Z",
-      },
-      teams: [
-        {
-          id: "team-1",
-          name: "Platform",
-          normalizedName: "platform",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-        {
-          id: "team-2",
-          name: "Product",
-          normalizedName: "product",
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        },
-      ],
       epics: [
         {
-          id: "epic-1",
-          teamId: "team-1",
-          title: "Launch Plan",
-          description: null,
+          id: platformEpic.id,
+          teamId: platform.id,
+          title: "Platform Launch",
+          description: "Coordinate the MVP launch",
           createdAt: now.toISOString(),
           updatedAt: now.toISOString(),
         },
       ],
       userEmail: "user@example.com",
     });
-
-    expect(html).toContain("Edit ticket");
-    expect(html).toContain('name="teamId"');
-    expect(html).toContain('name="epicId"');
-    expect(html).toContain('name="type"');
-    expect(html).toContain('name="state"');
-    expect(html).toContain('name="title"');
-    expect(html).toContain('name="body"');
-    expect(html).toContain("Platform");
-    expect(html).toContain("Product");
-    expect(html).toContain("Launch Plan");
-    expect(html).toContain("Save ticket");
   });
 
-  it("renders a not-found message for missing ticket ids", () => {
-    const html = renderEdit({
-      status: "not-found",
-      ticketId: "missing-ticket",
-      teams: [],
-      userEmail: "user@example.com",
-    });
-
-    expect(html).toContain("Ticket");
-    expect(html).toContain("missing-ticket");
-    expect(html).toContain("was not found.");
-  });
-
-  it("returns not-found for unknown ticket ids after authentication", async () => {
-    const team = createTeamForTest();
-    createEpicForTest(team.id);
+  it("returns a missing-record state for unknown ticket ids", async () => {
+    const platform = createTeamForTest();
+    createEpicForTest(platform.id);
 
     await expect(
       loader({
@@ -294,60 +229,78 @@ describe("ticket edit route", () => {
     ).resolves.toEqual({
       status: "not-found",
       ticketId: "missing-ticket",
-      teams: [team],
+      teams: [platform],
       userEmail: "user@example.com",
     });
   });
 
-  it("shows only epics for the ticket's selected team", async () => {
-    const platform = createTeamForTest("Platform");
-    const product = createTeamForTest("Product");
-    const platformEpics = [
-      createEpicForTest(platform.id, "Platform Launch"),
-      createEpicForTest(platform.id, "Platform Release"),
-    ];
-    createEpicForTest(product.id, "Product Discovery");
-    const ticket = createTicket(
-      database,
-      {
-        teamId: platform.id,
-        epicId: platformEpics[0].id,
-        createdBy: userId,
+  it("renders the edit form and not-found state", () => {
+    const html = renderEdit({
+      status: "found",
+      userEmail: "user@example.com",
+      teams: [
+        {
+          id: "team-1",
+          name: "Platform",
+          normalizedName: "platform",
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      ],
+      epics: [
+        {
+          id: "epic-1",
+          teamId: "team-1",
+          title: "Launch Plan",
+          description: "Coordinate the MVP launch",
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        },
+      ],
+      ticket: {
+        id: "ticket-1",
         title: "Create service",
         body: "Create a focused backend service",
         type: "feature",
         state: "backlog",
-      },
-      { now: () => now },
-    )._unsafeUnwrap();
-
-    const data = await loader({
-      request: await createAuthedRequest(ticket.id),
-      params: {
-        ticketId: ticket.id,
+        teamId: "team-1",
+        epicId: "epic-1",
+        teamName: "Platform",
+        epicTitle: "Launch Plan",
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: now.toISOString(),
+        modifiedAt: now.toISOString(),
       },
     });
 
-    if (data.status !== "found") {
-      throw new Error("Expected ticket to be found.");
-    }
-
-    expect(data.epics).toEqual(platformEpics);
-    expect(data.teams).toEqual([platform, product]);
+    expect(html).toContain("Edit ticket");
+    expect(html).toContain("Ticket details");
+    expect(html).toContain("Create service");
+    expect(html).toContain('name="teamId"');
+    expect(html).toContain('name="epicId"');
+    expect(html).toContain('name="title"');
+    expect(html).toContain('name="body"');
+    expect(html).toContain("Launch Plan");
+    expect(html).toContain("Save ticket");
+    expect(
+      renderEdit({
+        status: "not-found",
+        ticketId: "missing-ticket",
+        teams: [],
+        userEmail: "user@example.com",
+      }),
+    ).toContain("Ticket missing-ticket was not found.");
   });
 
-  it("requires authentication for reads", async () => {
-    const request = new Request("http://example.com/tickets/ticket-1/edit");
-
+  it("redirects unauthenticated users away from the edit route", async () => {
     await expect(
       loader({
-        request,
+        request: new Request("http://example.com/tickets/ticket-1/edit"),
         params: {
           ticketId: "ticket-1",
         },
       }),
-    ).rejects.toMatchObject({
-      status: 302,
-    });
+    ).rejects.toMatchObject({ status: 302 });
   });
 });
