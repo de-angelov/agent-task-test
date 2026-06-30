@@ -49,6 +49,8 @@ export type TicketCreateError =
 
 export type TicketReadError = "not-found";
 
+export type TicketDeleteError = "not-found";
+
 export type TicketUpdateError =
   | "empty-body"
   | "empty-title"
@@ -239,6 +241,25 @@ export function listTicketsForTeam(
     .all();
 }
 
+export function deleteTicket(
+  database: AppDb,
+  input: { id: string },
+): Result<void, TicketDeleteError> {
+  const ticket = database
+    .select({ id: schema.tickets.id })
+    .from(schema.tickets)
+    .where(eq(schema.tickets.id, input.id))
+    .get();
+
+  if (!ticket) {
+    return err("not-found");
+  }
+
+  database.delete(schema.tickets).where(eq(schema.tickets.id, input.id)).run();
+
+  return ok(undefined);
+}
+
 export function updateTicket(
   database: AppDb,
   input: {
@@ -380,4 +401,8 @@ export function mapTicketUpdateError(error: TicketUpdateError) {
     .with("epic-team-mismatch", () => "Epic must belong to the ticket team.")
     .with("not-found", () => "Ticket not found.")
     .exhaustive();
+}
+
+export function mapTicketDeleteError(error: TicketDeleteError) {
+  return match(error).with("not-found", () => "Ticket not found.").exhaustive();
 }
