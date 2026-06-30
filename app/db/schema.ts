@@ -1,6 +1,6 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow.server";
+import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 
 export const appMetadata = sqliteTable("app_metadata", {
   id: integer("id").primaryKey({ autoIncrement: true }),
