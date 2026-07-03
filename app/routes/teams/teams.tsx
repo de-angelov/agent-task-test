@@ -1,20 +1,18 @@
-import { data, useActionData, useLoaderData } from "react-router";
-import { match } from "ts-pattern";
+import { useState } from "react";
+import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
+import { Dialog } from "~/components/dialog";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import {
-  createTeam,
-  deleteTeam,
   listTeamManagementRows,
-  mapTeamMutationError,
-  renameTeam,
   type TeamManagementRow,
 } from "~/services/teams/teams.server";
 
 import { ScreenShell } from "../placeholders/placeholder-ui";
+import { handleTeamAction } from "./teams-action.server";
 
 type ActionData = {
   message: string;
@@ -43,51 +41,8 @@ export async function action({ request }: { request: Request }) {
   await requireAuthenticatedUser(request);
 
   const formData = await request.formData();
-  const intent = String(formData.get("intent") ?? "");
 
-  return match(intent)
-    .with("create", () =>
-      mapMutationResult(
-        createTeam(db, { name: String(formData.get("name") ?? "") }),
-      ),
-    )
-    .with("rename", () =>
-      mapMutationResult(
-        renameTeam(db, {
-          id: String(formData.get("teamId") ?? ""),
-          name: String(formData.get("name") ?? ""),
-        }),
-      ),
-    )
-    .with("delete", () =>
-      mapMutationResult(
-        deleteTeam(db, { id: String(formData.get("teamId") ?? "") }),
-      ),
-    )
-    .otherwise(() =>
-      data<ActionData>(
-        { message: "Unknown team action.", status: "error" },
-        { status: 400 },
-      ),
-    );
-}
-
-function mapMutationResult(
-  result: ReturnType<typeof createTeam | typeof renameTeam | typeof deleteTeam>,
-) {
-  if (result.isErr()) {
-    const status = result.error.startsWith("blocked") ? 409 : 400;
-
-    return data<ActionData>(
-      { message: mapTeamMutationError(result.error), status: "error" },
-      { status },
-    );
-  }
-
-  return data<ActionData>(
-    { message: "Team changes saved.", status: "success" },
-    { status: 200 },
-  );
+  return handleTeamAction(db, formData);
 }
 
 export function TeamsView({
@@ -167,15 +122,7 @@ export function TeamsView({
           {actionData.message}
         </p>
       ) : null}
-      <form className="form-panel" method="post">
-        <h2>Create team</h2>
-        <input name="intent" type="hidden" value="create" />
-        <label className="form-field">
-          <span>Team name</span>
-          <input name="name" />
-        </label>
-        <Button type="submit">Create team</Button>
-      </form>
+      <TeamCreateDialog />
       <Table
         caption="Teams"
         columns={columns}
@@ -184,6 +131,39 @@ export function TeamsView({
         rows={teams}
       />
     </ScreenShell>
+  );
+}
+
+function TeamCreateDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setIsOpen(true)}>Create team</Button>
+      <Dialog
+        cancelAction={
+          <Button onClick={() => setIsOpen(false)} variant="secondary">
+            Cancel
+          </Button>
+        }
+        confirmAction={
+          <Button form="create-team-form" type="submit">
+            Create team
+          </Button>
+        }
+        isOpen={isOpen}
+        onCancel={() => setIsOpen(false)}
+        title="Create team"
+      >
+        <form className="form-panel" id="create-team-form" method="post">
+          <input name="intent" type="hidden" value="create" />
+          <label className="form-field">
+            <span>Team name</span>
+            <input name="name" />
+          </label>
+        </form>
+      </Dialog>
+    </>
   );
 }
 
