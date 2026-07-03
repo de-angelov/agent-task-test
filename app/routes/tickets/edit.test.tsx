@@ -188,7 +188,7 @@ describe("ticket edit route", () => {
       ticket: {
         ...ticket,
         teamName: "Platform",
-        epicTitle: "Launch Plan",
+        epicTitle: "Platform Launch",
         createdByEmail: "user@example.com",
       },
       teams: [
@@ -211,13 +211,12 @@ describe("ticket edit route", () => {
         {
           id: platformEpic.id,
           teamId: platform.id,
-          title: "Launch Plan",
+          title: "Platform Launch",
           description: "Coordinate the MVP launch",
           createdAt: now.toISOString(),
           updatedAt: now.toISOString(),
         },
       ],
-      selectedTeamId: platform.id,
       userEmail: "user@example.com",
     });
   });
@@ -233,6 +232,7 @@ describe("ticket edit route", () => {
     ).resolves.toEqual({
       status: "not-found",
       ticketId: "missing-ticket",
+      teams: [],
       userEmail: "user@example.com",
     });
   });
@@ -243,7 +243,6 @@ describe("ticket edit route", () => {
         data={{
           status: "found",
           userEmail: "user@example.com",
-          selectedTeamId: "team-1",
           ticket: {
             id: "ticket-1",
             title: "Create service",
