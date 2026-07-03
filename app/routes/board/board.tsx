@@ -3,28 +3,11 @@ import { useLoaderData } from "react-router";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
+import { ticketStates, type TicketState } from "~/services/tickets/ticket-workflow";
 import { listTicketsForTeam, type TicketReadModel } from "~/services/tickets/tickets.server";
 import { listTeams, type Team } from "~/services/teams/teams.server";
 
 import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
-
-const states = [
-  "New",
-  "Ready for implementation",
-  "In progress",
-  "Ready for acceptance",
-  "Done",
-];
-
-const cards = [
-  { title: "Set up account verification", type: "feature", state: "New" },
-  {
-    title: "Persist ticket workflow state",
-    type: "fix",
-    state: "Ready for implementation",
-  },
-  { title: "Review blocked deletion message", type: "bug", state: "Done" },
-];
 
 type LoaderData = {
   teams: Team[];
@@ -33,6 +16,18 @@ type LoaderData = {
   tickets: TicketReadModel[];
   userEmail: string;
 };
+
+type BoardColumn = {
+  state: TicketState;
+  tickets: TicketReadModel[];
+};
+
+export function getBoardColumns(tickets: TicketReadModel[]): BoardColumn[] {
+  return ticketStates.map((state) => ({
+    state,
+    tickets: tickets.filter((ticket) => ticket.state === state),
+  }));
+}
 
 export function meta() {
   return [{ title: "Kanban Board" }];
@@ -71,8 +66,11 @@ export function BoardView({
   epics = [],
   selectedTeamId = "",
   teams = [],
+  tickets = [],
   userEmail = "user@example.com",
 }: Partial<LoaderData> = {}) {
+  const columns = getBoardColumns(tickets);
+
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
       <PlaceholderNotice>
@@ -120,18 +118,16 @@ export function BoardView({
         </a>
       </section>
       <section className="kanban-board" aria-label="Ticket workflow">
-        {states.map((state) => (
-          <article className="kanban-column" key={state}>
-            <h2>{state}</h2>
-            {cards
-              .filter((card) => card.state === state)
-              .map((card) => (
-                <a className="ticket-card" href="/tickets/placeholder" key={card.title}>
-                  <strong>{card.title}</strong>
-                  <span>{card.type}</span>
-                  <span>Authentication</span>
-                </a>
-              ))}
+        {columns.map((column) => (
+          <article className="kanban-column" key={column.state}>
+            <h2>{column.state}</h2>
+            {column.tickets.map((ticket) => (
+              <a className="ticket-card" href={`/tickets/${ticket.id}`} key={ticket.id}>
+                <strong>{ticket.title}</strong>
+                <span>{ticket.type}</span>
+                <span>{ticket.epicTitle ?? "No epic"}</span>
+              </a>
+            ))}
           </article>
         ))}
       </section>

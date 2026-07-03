@@ -2,11 +2,14 @@ import Database from "better-sqlite3";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { renderToString } from "react-dom/server";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import * as schema from "~/db/schema";
 import { createEpic } from "~/services/epics/epics.server";
+import type { TicketState, TicketType } from "~/services/tickets/ticket-workflow";
 import { createTicket } from "~/services/tickets/tickets.server";
+import type { TicketReadModel } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 
 type BoardModule = typeof import("./board");
@@ -87,6 +90,30 @@ function createTicketForTest(input: {
     },
     { now: () => now },
   )._unsafeUnwrap();
+}
+
+function makeTicketReadModel(input: {
+  id: string;
+  title: string;
+  state: TicketState;
+  modifiedAt?: string;
+  type?: TicketType;
+}): TicketReadModel {
+  return {
+    id: input.id,
+    title: input.title,
+    body: "Ticket body",
+    type: input.type ?? "feature",
+    state: input.state,
+    teamId: "team-1",
+    teamName: "Platform",
+    epicId: null,
+    epicTitle: null,
+    createdBy: userId,
+    createdByEmail: userEmail,
+    createdAt: "2026-06-30T09:00:00.000Z",
+    modifiedAt: input.modifiedAt ?? "2026-06-30T10:00:00.000Z",
+  };
 }
 
 beforeAll(async () => {
@@ -190,6 +217,77 @@ beforeEach(() => {
 });
 
 describe("board route", () => {
+  it("renders exactly four workflow columns in order", () => {
+    const html = renderToString(<board.BoardView tickets={[]} />);
+
+    expect(html.match(/class="kanban-column"/g)).toHaveLength(4);
+    expect(html.indexOf("<h2>backlog</h2>")).toBeLessThan(
+      html.indexOf("<h2>todo</h2>"),
+    );
+    expect(html.indexOf("<h2>todo</h2>")).toBeLessThan(
+      html.indexOf("<h2>in-progress</h2>"),
+    );
+    expect(html.indexOf("<h2>in-progress</h2>")).toBeLessThan(
+      html.indexOf("<h2>done</h2>"),
+    );
+  });
+
+  it("includes empty columns when no tickets are loaded", () => {
+    expect(board.getBoardColumns([])).toEqual([
+      { state: "backlog", tickets: [] },
+      { state: "todo", tickets: [] },
+      { state: "in-progress", tickets: [] },
+      { state: "done", tickets: [] },
+    ]);
+  });
+
+  it("groups loaded tickets by workflow state", () => {
+    const backlogTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Backlog ticket",
+      state: "backlog",
+    });
+    const doneTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Done ticket",
+      state: "done",
+    });
+
+    expect(board.getBoardColumns([doneTicket, backlogTicket])).toEqual([
+      { state: "backlog", tickets: [backlogTicket] },
+      { state: "todo", tickets: [] },
+      { state: "in-progress", tickets: [] },
+      { state: "done", tickets: [doneTicket] },
+    ]);
+  });
+
+  it("preserves loader-provided ticket ordering within each column", () => {
+    const newerTodoTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Newer todo ticket",
+      state: "todo",
+      modifiedAt: "2026-06-30T12:00:00.000Z",
+    });
+    const backlogTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Backlog ticket",
+      state: "backlog",
+      modifiedAt: "2026-06-30T11:00:00.000Z",
+    });
+    const olderTodoTicket = makeTicketReadModel({
+      id: "ticket-3",
+      title: "Older todo ticket",
+      state: "todo",
+      modifiedAt: "2026-06-30T10:00:00.000Z",
+    });
+
+    const todoColumn = board
+      .getBoardColumns([newerTodoTicket, backlogTicket, olderTodoTicket])
+      .find((column) => column.state === "todo");
+
+    expect(todoColumn?.tickets).toEqual([newerTodoTicket, olderTodoTicket]);
+  });
+
   it("redirects unauthenticated requests to login", async () => {
     const request = new Request("http://example.com/board");
 
