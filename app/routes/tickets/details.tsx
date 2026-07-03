@@ -1,10 +1,16 @@
-import { useLoaderData } from "react-router";
+import { useActionData, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
+import { Button } from "~/components/button";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import type { TicketReadModel } from "~/services/tickets/tickets.server";
 
-import { readTicketDetails, type LoaderData } from "./details.server";
+import {
+  handleTicketDeleteAction,
+  readTicketDetails,
+  type LoaderData,
+  type TicketDeleteActionData,
+} from "./details.server";
 import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
@@ -24,6 +30,18 @@ export async function loader({ request, params }: LoaderArgs) {
   const { db } = await import("~/db/client.server");
 
   return readTicketDetails(db, params.ticketId ?? "");
+}
+
+export async function action({ request, params }: LoaderArgs) {
+  await requireAuthenticatedUser(request);
+
+  const { db } = await import("~/db/client.server");
+
+  return handleTicketDeleteAction(
+    db,
+    params.ticketId ?? "",
+    await request.formData(),
+  );
 }
 
 function getStateLabel(state: TicketReadModel["state"]) {
@@ -64,15 +82,36 @@ function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
   );
 }
 
-export function TicketDetailsView({ data }: { data: LoaderData }) {
+export function TicketDetailsView({
+  actionData,
+  data,
+}: {
+  actionData?: TicketDeleteActionData;
+  data: LoaderData;
+}) {
   return (
     <ScreenShell title="Ticket details">
+      {actionData ? (
+        <p className="placeholder-notice" role="alert">
+          {actionData.message}
+        </p>
+      ) : null}
       {data.status === "found" ? (
         <>
           <TicketDetailsFields ticket={data.ticket} />
           <a className="button-link" href={`/tickets/${data.ticket.id}/edit`}>
             Edit ticket
           </a>
+          <form className="form-panel" method="post">
+            <h2>Delete ticket</h2>
+            <label className="form-field">
+              <input name="confirmDelete" type="checkbox" value="yes" />
+              <span>Confirm deletion</span>
+            </label>
+            <Button type="submit" variant="destructive">
+              Delete ticket
+            </Button>
+          </form>
         </>
       ) : (
         <p role="status">Ticket {data.ticketId} was not found.</p>
@@ -83,6 +122,7 @@ export function TicketDetailsView({ data }: { data: LoaderData }) {
 
 export default function TicketDetails() {
   const data = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
 
-  return <TicketDetailsView data={data} />;
+  return <TicketDetailsView actionData={actionData} data={data} />;
 }
