@@ -70,7 +70,7 @@ describe("minimum placeholder routes", () => {
       />,
     );
 
-    expect(board).toContain("Ready for implementation");
+    expect(board).toContain("backlog");
     expect(board).toContain("Create ticket");
     expect(board).toContain("user@example.com");
     expect(board).toContain("Log out");
