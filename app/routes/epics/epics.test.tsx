@@ -149,7 +149,13 @@ describe("epics route", () => {
       />,
     );
 
+    expect(html).toContain("<dialog");
     expect(html).toContain("Create epic");
+    expect(html).toContain('id="create-epic-form"');
+    expect(html).toContain('name="intent"');
+    expect(html).toContain('value="create"');
+    expect(html).toContain('form="create-epic-form"');
+    expect(html).toContain("Cancel");
     expect(html).toContain("Platform");
     expect(html).toContain("Launch Plan");
     expect(html).toContain("Coordinate the MVP launch");
@@ -165,6 +171,43 @@ describe("epics route", () => {
     expect(html).toContain(
       "Remove the epic from referenced tickets before deleting it.",
     );
+  });
+
+  it("renders dialog actions for opening, cancelling, and submitting epic creation", () => {
+    const html = renderToString(
+      <EpicsView
+        epics={[]}
+        teams={[
+          {
+            id: "team-1",
+            name: "Platform",
+            normalizedName: "platform",
+            createdAt: "2026-06-28T10:00:00.000Z",
+            updatedAt: "2026-06-28T10:00:00.000Z",
+          },
+          {
+            id: "team-2",
+            name: "Product",
+            normalizedName: "product",
+            createdAt: "2026-06-28T10:00:00.000Z",
+            updatedAt: "2026-06-28T10:00:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('<button class="_button_');
+    expect(html).toContain('type="button"');
+    expect(html).toContain("Create epic");
+    expect(html).toContain("Cancel");
+    expect(html).toContain('form="create-epic-form"');
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('<select name="teamId">');
+    expect(html).toContain('<option value="team-1">Platform</option>');
+    expect(html).toContain('<option value="team-2">Product</option>');
+    expect(html).toContain('name="title"');
+    expect(html).toContain('name="description"');
+    expect(html).not.toContain("<h2>Create epic</h2><input");
   });
 
   it("renders an enabled delete action for epics without tickets", () => {
