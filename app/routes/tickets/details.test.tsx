@@ -10,7 +10,8 @@ import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
 
-import { loader, TicketDetailsView } from "./details";
+import { action, loader, TicketDetailsView } from "./details";
+import { handleTicketDeleteAction } from "./details.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 const userId = "user-1";
@@ -141,6 +142,31 @@ async function createAuthedRequest(ticketId?: string) {
   });
 }
 
+async function createAuthedFormRequest(
+  ticketId: string,
+  values: Record<string, string> = {},
+) {
+  const cookie = await createSessionCookie(sessionId);
+
+  return new Request(`http://example.com/tickets/${ticketId}`, {
+    body: createFormData(values),
+    headers: {
+      Cookie: cookie,
+    },
+    method: "POST",
+  });
+}
+
+function createFormData(values: Record<string, string>) {
+  const formData = new FormData();
+
+  for (const [key, value] of Object.entries(values)) {
+    formData.set(key, value);
+  }
+
+  return formData;
+}
+
 function renderDetails(data: Parameters<typeof TicketDetailsView>[0]["data"]) {
   return renderToString(
     <MemoryRouter>
@@ -163,6 +189,13 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
     },
     { now: () => now },
   )._unsafeUnwrap();
+}
+
+function unwrapActionData(result: ReturnType<typeof handleTicketDeleteAction>) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
+  };
 }
 
 describe("ticket details route", () => {
@@ -201,7 +234,7 @@ describe("ticket details route", () => {
     });
   });
 
-  it("renders ticket fields and the edit navigation link", () => {
+  it("renders ticket fields, navigation, and delete confirmation", () => {
     const html = renderDetails({
       status: "found",
       ticket: {
@@ -233,6 +266,11 @@ describe("ticket details route", () => {
     expect(html).toContain("2026-06-30T10:30:00.000Z</time></dd>");
     expect(html).toContain('href="/tickets/ticket-1/edit"');
     expect(html.match(/href="\/tickets\/ticket-1\/edit"/g)).toHaveLength(1);
+    expect(html).toContain('method="post"');
+    expect(html).toContain('name="confirmDelete"');
+    expect(html).toContain('value="yes"');
+    expect(html).toContain("Confirm deletion");
+    expect(html).toContain("Delete ticket");
   });
 
   it("renders No epic when the ticket has no epic", () => {
@@ -323,5 +361,124 @@ describe("ticket details route", () => {
     ).rejects.toMatchObject({
       status: 302,
     });
+  });
+
+  it("requires authentication before deleting tickets", async () => {
+    await expect(
+      action({
+        request: new Request("http://example.com/tickets/ticket-1", {
+          body: createFormData({ confirmDelete: "yes" }),
+          method: "POST",
+        }),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("returns a validation error when delete confirmation is missing", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Keep ticket",
+        body: "Do not delete without confirmation",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = unwrapActionData(
+      handleTicketDeleteAction(database, ticket.id, createFormData({})),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Confirm deletion before deleting this ticket.",
+      status: "error",
+    });
+    expect(
+      database
+        .select({ id: schema.tickets.id })
+        .from(schema.tickets)
+        .get(),
+    ).toEqual({ id: ticket.id });
+  });
+
+  it("deletes a confirmed ticket and redirects to the board", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Delete ticket",
+        body: "Delete after confirmation",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = handleTicketDeleteAction(
+      database,
+      ticket.id,
+      createFormData({ confirmDelete: "yes" }),
+    ) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe("/board");
+    expect(database.select().from(schema.tickets).get()).toBeUndefined();
+  });
+
+  it("returns a validation error when the confirmed ticket is missing", () => {
+    const result = unwrapActionData(
+      handleTicketDeleteAction(
+        database,
+        "missing-ticket",
+        createFormData({ confirmDelete: "yes" }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket not found.",
+      status: "error",
+    });
+  });
+
+  it("redirects from the authenticated delete route action after deletion", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Delete through route",
+        body: "Invoke the authenticated route action",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = (await action({
+      request: await createAuthedFormRequest(ticket.id, {
+        confirmDelete: "yes",
+      }),
+      params: {
+        ticketId: ticket.id,
+      },
+    })) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe("/board");
+    expect(database.select().from(schema.tickets).get()).toBeUndefined();
   });
 });

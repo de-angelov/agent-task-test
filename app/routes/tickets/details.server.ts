@@ -1,6 +1,12 @@
+import { data, redirect } from "react-router";
+
 import type { AppDb } from "~/services/teams/teams.server";
-import type { TicketReadModel } from "~/services/tickets/tickets.server";
-import { getTicketById } from "~/services/tickets/tickets.server";
+import {
+  deleteTicket,
+  getTicketById,
+  mapTicketDeleteError,
+  type TicketReadModel,
+} from "~/services/tickets/tickets.server";
 
 export type TicketDetailsFound = {
   status: "found";
@@ -13,6 +19,11 @@ export type TicketDetailsNotFound = {
 };
 
 export type LoaderData = TicketDetailsFound | TicketDetailsNotFound;
+
+export type TicketDeleteActionData = {
+  message: string;
+  status: "error";
+};
 
 export function readTicketDetails(
   database: AppDb,
@@ -31,4 +42,31 @@ export function readTicketDetails(
     status: "found",
     ticket: ticket.value,
   };
+}
+
+export function handleTicketDeleteAction(
+  database: AppDb,
+  ticketId: string,
+  formData: FormData,
+) {
+  if (formData.get("confirmDelete") !== "yes") {
+    return data<TicketDeleteActionData>(
+      {
+        message: "Confirm deletion before deleting this ticket.",
+        status: "error",
+      },
+      { status: 400 },
+    );
+  }
+
+  const result = deleteTicket(database, { id: ticketId });
+
+  if (result.isErr()) {
+    return data<TicketDeleteActionData>(
+      { message: mapTicketDeleteError(result.error), status: "error" },
+      { status: 400 },
+    );
+  }
+
+  return redirect("/board");
 }
