@@ -55,11 +55,14 @@ export async function loader({ request }: { request: Request }) {
     } satisfies LoaderData;
   }
 
+  const epics = listEpics(db, { teamId: selectedTeamId });
+  const tickets = listTicketsForTeam(db, { teamId: selectedTeamId });
+
   return {
     teams,
     selectedTeamId,
-    epics: listEpics(db, { teamId: selectedTeamId }),
-    tickets: listTicketsForTeam(db, { teamId: selectedTeamId }),
+    epics,
+    tickets,
     userEmail: user.email,
   } satisfies LoaderData;
 }

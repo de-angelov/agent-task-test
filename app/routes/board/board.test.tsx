@@ -1,5 +1,4 @@
 import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -48,7 +47,7 @@ function seedAuthentication() {
     id: sessionId,
     userId,
     createdAt: timestamp,
-    expiresAt: timestamp + 24 * 60 * 60 * 1000,
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   }).run();
 }
 
@@ -171,7 +170,8 @@ beforeAll(async () => {
       created_at integer NOT NULL
     );
   `);
-  database = drizzle(sqlite, { schema });
+  const { db: appDb } = await import("~/db/client.server");
+  database = appDb as AppDb;
   const { createSessionCookie } = await import(
     "~/services/session/session.server"
   );
@@ -201,8 +201,8 @@ describe("board route", () => {
   it("selects the first team when no team is requested", async () => {
     const platform = createTeamForTest("Platform");
     const product = createTeamForTest("Product");
-    createEpicForTest(platform.id, "Platform Launch");
-    createTicketForTest({
+    const platformEpic = createEpicForTest(platform.id, "Platform Launch");
+    const platformTicket = createTicketForTest({
       teamId: platform.id,
       title: "Platform ticket",
       type: "feature",
@@ -226,6 +226,19 @@ describe("board route", () => {
       { id: product.id, name: "Product" },
     ]);
     expect(data.selectedTeamId).toBe(platform.id);
+    expect(data.epics).toEqual([platformEpic]);
+    expect(data.tickets).toMatchObject([
+      {
+        id: platformTicket.id,
+        teamId: platform.id,
+        teamName: "Platform",
+        epicTitle: null,
+        createdByEmail: userEmail,
+        title: "Platform ticket",
+        type: "feature",
+        state: "backlog",
+      },
+    ]);
   });
 
   it("selects an explicitly requested valid team", async () => {
@@ -238,8 +251,8 @@ describe("board route", () => {
       type: "feature",
       state: "backlog",
     });
-    createEpicForTest(product.id, "Product Discovery");
-    createTicketForTest({
+    const productEpic = createEpicForTest(product.id, "Product Discovery");
+    const productTicket = createTicketForTest({
       teamId: product.id,
       title: "Product ticket",
       type: "task",
@@ -252,17 +265,57 @@ describe("board route", () => {
 
     expect(data.selectedTeamId).toBe(product.id);
     expect(data.userEmail).toBe(userEmail);
+    expect(data.epics).toEqual([productEpic]);
+    expect(data.tickets).toMatchObject([
+      {
+        id: productTicket.id,
+        teamId: product.id,
+        teamName: "Product",
+        epicTitle: null,
+        createdByEmail: userEmail,
+        title: "Product ticket",
+        type: "task",
+        state: "todo",
+      },
+    ]);
   });
 
   it("falls back to the first team when the requested team is invalid", async () => {
     const platform = createTeamForTest("Platform");
-    createTeamForTest("Product");
+    const product = createTeamForTest("Product");
+    const platformEpic = createEpicForTest(platform.id, "Platform Launch");
+    const platformTicket = createTicketForTest({
+      teamId: platform.id,
+      title: "Platform ticket",
+      type: "feature",
+      state: "backlog",
+    });
+    createEpicForTest(product.id, "Product Discovery");
+    createTicketForTest({
+      teamId: product.id,
+      title: "Product ticket",
+      type: "bug",
+      state: "todo",
+    });
 
     const data = await board.loader({
       request: createAuthenticatedRequest("http://example.com/board?teamId=missing-team"),
     });
 
     expect(data.selectedTeamId).toBe(platform.id);
+    expect(data.epics).toEqual([platformEpic]);
+    expect(data.tickets).toMatchObject([
+      {
+        id: platformTicket.id,
+        teamId: platform.id,
+        teamName: "Platform",
+        epicTitle: null,
+        createdByEmail: userEmail,
+        title: "Platform ticket",
+        type: "feature",
+        state: "backlog",
+      },
+    ]);
   });
 
   it("returns an empty board state when no teams exist", async () => {
