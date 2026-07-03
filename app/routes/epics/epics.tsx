@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
+import { Dialog } from "~/components/dialog";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
 import {
@@ -132,29 +134,7 @@ export function EpicsView({
           {actionData.message}
         </p>
       ) : null}
-      <form className="form-panel" method="post">
-        <h2>Create epic</h2>
-        <input name="intent" type="hidden" value="create" />
-        <label className="form-field">
-          <span>Team</span>
-          <select name="teamId">
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Epic title</span>
-          <input name="title" />
-        </label>
-        <label className="form-field">
-          <span>Description</span>
-          <textarea name="description" rows={4} />
-        </label>
-        <Button type="submit">Create epic</Button>
-      </form>
+      <EpicCreateDialog teams={teams} />
       <Table
         caption="Epics"
         columns={columns}
@@ -163,6 +143,53 @@ export function EpicsView({
         rows={epics}
       />
     </ScreenShell>
+  );
+}
+
+function EpicCreateDialog({ teams }: { teams: Team[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setIsOpen(true)}>Create epic</Button>
+      <Dialog
+        cancelAction={
+          <Button onClick={() => setIsOpen(false)} variant="secondary">
+            Cancel
+          </Button>
+        }
+        confirmAction={
+          <Button form="create-epic-form" type="submit">
+            Create epic
+          </Button>
+        }
+        isOpen={isOpen}
+        onCancel={() => setIsOpen(false)}
+        title="Create epic"
+      >
+        <form className="form-panel" id="create-epic-form" method="post">
+          <input name="intent" type="hidden" value="create" />
+          <label className="form-field">
+            <span>Team</span>
+            <select name="teamId">
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Epic title</span>
+            <input name="title" />
+          </label>
+          <label className="form-field">
+            <span>Description</span>
+            <textarea name="description" rows={4} />
+          </label>
+        </form>
+      </Dialog>
+    </>
   );
 }
 
