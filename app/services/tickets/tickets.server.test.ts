@@ -6,6 +6,7 @@ import * as schema from "~/db/schema";
 
 import { createEpic, deleteEpic } from "../epics/epics.server";
 import { createTeam, deleteTeam, type AppDb } from "../teams/teams.server";
+import { listTicketActivity } from "../ticket-activity/ticket-activity.server";
 import {
   createTicket,
   deleteTicket,
@@ -69,6 +70,17 @@ beforeEach(() => {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
       FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE,
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
+    );
+
+    CREATE TABLE ticket_activity (
+      id text PRIMARY KEY NOT NULL,
+      ticket_id text NOT NULL,
+      actor_id text NOT NULL,
+      action_type text NOT NULL,
+      detail text,
+      created_at text NOT NULL,
+      FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
     INSERT INTO users (id, email, password_hash, created_at)
@@ -455,7 +467,9 @@ describe("ticket service", () => {
       { now: () => now },
     )._unsafeUnwrap();
 
-    expect(deleteTicket(database, { id: deletedTicket.id }).isOk()).toBe(true);
+    expect(
+      deleteTicket(database, { id: deletedTicket.id, actorId: "user-1" }).isOk(),
+    ).toBe(true);
 
     expect(database.select().from(schema.tickets).all()).toEqual([retainedTicket]);
     expect(
@@ -464,9 +478,12 @@ describe("ticket service", () => {
   });
 
   it("returns not-found when deleting a missing ticket", () => {
-    expect(deleteTicket(database, { id: "missing-ticket" })._unsafeUnwrapErr()).toBe(
-      "not-found",
-    );
+    expect(
+      deleteTicket(database, {
+        id: "missing-ticket",
+        actorId: "user-1",
+      })._unsafeUnwrapErr(),
+    ).toBe("not-found");
   });
 
   it("preserves team and epic blocked-delete behavior until referenced tickets are deleted", () => {
@@ -493,7 +510,9 @@ describe("ticket service", () => {
       "blocked-by-tickets",
     );
 
-    expect(deleteTicket(database, { id: ticket.id }).isOk()).toBe(true);
+    expect(
+      deleteTicket(database, { id: ticket.id, actorId: "user-1" }).isOk(),
+    ).toBe(true);
 
     expect(deleteEpic(database, { id: epic.id }).isOk()).toBe(true);
     expect(deleteTeam(database, { id: team.id }).isOk()).toBe(true);
@@ -782,5 +801,178 @@ describe("ticket service", () => {
 
   it("maps delete errors to user-facing messages", () => {
     expect(mapTicketDeleteError("not-found")).toBe("Ticket not found.");
+    expect(mapTicketDeleteError("actor-not-found")).toBe("Unable to delete ticket.");
+  });
+});
+
+describe("ticket activity write integration", () => {
+  function createTeamForTest(name = "Platform") {
+    return createTeam(database, { name }, { now: () => now })._unsafeUnwrap();
+  }
+
+  function createEpicForTest(teamId: string, title = "Launch Plan") {
+    return createEpic(
+      database,
+      { teamId, title, description: "Coordinate the MVP launch" },
+      { now: () => now },
+    )._unsafeUnwrap();
+  }
+
+  function createTicketForTest(teamId: string) {
+    return createTicket(
+      database,
+      {
+        teamId,
+        createdBy: "user-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+  }
+
+  it("records a state-changed entry when the ticket state changes", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: team.id,
+        title: ticket.title,
+        body: ticket.body,
+        type: ticket.type,
+        state: "todo",
+        actorId: "user-1",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(listTicketActivity(database, { ticketId: ticket.id })).toMatchObject([
+      {
+        ticketId: ticket.id,
+        actorId: "user-1",
+        actionType: "state-changed",
+        detail: "backlog -> todo",
+      },
+    ]);
+  });
+
+  it("records title-changed, body-changed, team-changed, and epic-changed entries for a combined edit", () => {
+    const platform = createTeamForTest("Platform");
+    const product = createTeamForTest("Product");
+    const epic = createEpicForTest(product.id, "Launch Plan");
+    const ticket = createTicketForTest(platform.id);
+
+    updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: product.id,
+        epicId: epic.id,
+        title: "Updated title",
+        body: "Updated body",
+        type: ticket.type,
+        state: ticket.state,
+        actorId: "user-1",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const activity = listTicketActivity(database, { ticketId: ticket.id });
+    const byActionType = new Map(
+      activity.map((entry) => [entry.actionType, entry]),
+    );
+
+    expect([...byActionType.keys()].sort()).toEqual(
+      ["body-changed", "epic-changed", "team-changed", "title-changed"].sort(),
+    );
+    expect(byActionType.get("title-changed")).toMatchObject({
+      detail: "Create service -> Updated title",
+    });
+    expect(byActionType.get("body-changed")).toMatchObject({ detail: null });
+    expect(byActionType.get("team-changed")).toMatchObject({
+      detail: `${platform.id} -> ${product.id}`,
+    });
+    expect(byActionType.get("epic-changed")).toMatchObject({
+      detail: `none -> ${epic.id}`,
+    });
+  });
+
+  it("does not record activity when submitted values match persisted values", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: team.id,
+        title: ticket.title,
+        body: ticket.body,
+        type: ticket.type,
+        state: ticket.state,
+        actorId: "user-1",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(listTicketActivity(database, { ticketId: ticket.id })).toEqual([]);
+  });
+
+  it("does not record activity when the caller supplies no actor id", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    updateTicket(
+      database,
+      {
+        id: ticket.id,
+        teamId: team.id,
+        title: ticket.title,
+        body: ticket.body,
+        type: ticket.type,
+        state: "todo",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    expect(listTicketActivity(database, { ticketId: ticket.id })).toEqual([]);
+  });
+
+  it("records a deleted entry for the acting user before removing the ticket", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    expect(
+      deleteTicket(
+        database,
+        { id: ticket.id, actorId: "user-1" },
+        { now: () => now },
+      ).isOk(),
+    ).toBe(true);
+
+    expect(database.select().from(schema.tickets).all()).toEqual([]);
+    expect(listTicketActivity(database, { ticketId: ticket.id })).toEqual([]);
+  });
+
+  it("keeps the ticket and reports actor-not-found without deleting on an unknown actor", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    expect(
+      deleteTicket(database, {
+        id: ticket.id,
+        actorId: "missing-user",
+      })._unsafeUnwrapErr(),
+    ).toBe("actor-not-found");
+
+    expect(database.select().from(schema.tickets).all()).toMatchObject([
+      { id: ticket.id },
+    ]);
+    expect(listTicketActivity(database, { ticketId: ticket.id })).toEqual([]);
   });
 });

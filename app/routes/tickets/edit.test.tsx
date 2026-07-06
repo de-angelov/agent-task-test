@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +78,17 @@ beforeEach(() => {
       FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE RESTRICT ON UPDATE CASCADE,
       FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE RESTRICT ON UPDATE CASCADE,
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
+    );
+
+    CREATE TABLE ticket_activity (
+      id text PRIMARY KEY NOT NULL,
+      ticket_id text NOT NULL,
+      actor_id text NOT NULL,
+      action_type text NOT NULL,
+      detail text,
+      created_at text NOT NULL,
+      FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
 
     CREATE TABLE email_verification_tokens (
@@ -446,6 +458,7 @@ describe("ticket edit route", () => {
     const result = handleTicketEditAction(
       database,
       ticket.id,
+      userId,
       createFormData({
         body: "Updated body",
         epicId: epic.id,
@@ -469,6 +482,54 @@ describe("ticket edit route", () => {
     });
   });
 
+  it("records ticket activity for each changed field when saving edits", () => {
+    const team = createTeamForTest();
+    const otherTeam = createTeamForTest("Product");
+    const epic = createEpicForTest(otherTeam.id, "Launch Plan");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    handleTicketEditAction(
+      database,
+      ticket.id,
+      userId,
+      createFormData({
+        body: "Updated body",
+        epicId: epic.id,
+        state: "todo",
+        teamId: otherTeam.id,
+        title: "Updated title",
+        type: "bug",
+      }),
+    );
+
+    const activity = database
+      .select({ actionType: schema.ticketActivity.actionType })
+      .from(schema.ticketActivity)
+      .where(eq(schema.ticketActivity.ticketId, ticket.id))
+      .all();
+
+    expect(activity.map((entry) => entry.actionType).sort()).toEqual(
+      [
+        "body-changed",
+        "epic-changed",
+        "state-changed",
+        "team-changed",
+        "title-changed",
+      ].sort(),
+    );
+  });
+
   it("returns a validation error when the ticket title is empty", () => {
     const team = createTeamForTest();
     const ticket = createTicket(
@@ -488,6 +549,7 @@ describe("ticket edit route", () => {
       handleTicketEditAction(
         database,
         ticket.id,
+        userId,
         createFormData({
           body: "Updated body",
           state: "backlog",
@@ -512,6 +574,7 @@ describe("ticket edit route", () => {
       handleTicketEditAction(
         database,
         "missing-ticket",
+        userId,
         createFormData({
           body: "Updated body",
           state: "backlog",
@@ -550,6 +613,7 @@ describe("ticket edit route", () => {
       handleTicketEditAction(
         database,
         ticket.id,
+        userId,
         createFormData({
           body: "Updated body",
           epicId: otherTeamEpic.id,

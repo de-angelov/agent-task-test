@@ -31,11 +31,12 @@ export async function loader({ request, params }: LoaderArgs) {
 }
 
 export async function action({ request, params }: LoaderArgs) {
-  await requireAuthenticatedUser(request);
+  const user = await requireAuthenticatedUser(request);
 
   return handleTicketEditAction(
     db,
     params.ticketId ?? "",
+    user.id,
     await request.formData(),
   );
 }
