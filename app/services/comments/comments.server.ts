@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { err, ok, type Result } from "neverthrow";
 
 import * as schema from "~/db/schema";
@@ -15,6 +15,15 @@ export interface Comment {
   id: string;
   ticketId: string;
   authorId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface CommentReadModel {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  authorEmail: string;
   body: string;
   createdAt: string;
 }
@@ -73,4 +82,26 @@ export function addTicketComment(
   database.insert(schema.comments).values(comment).run();
 
   return ok(comment);
+}
+
+const commentReadColumns = {
+  id: schema.comments.id,
+  ticketId: schema.comments.ticketId,
+  authorId: schema.comments.authorId,
+  authorEmail: schema.users.email,
+  body: schema.comments.body,
+  createdAt: schema.comments.createdAt,
+};
+
+export function listTicketComments(
+  database: AppDb,
+  input: { ticketId: string },
+): CommentReadModel[] {
+  return database
+    .select(commentReadColumns)
+    .from(schema.comments)
+    .innerJoin(schema.users, eq(schema.users.id, schema.comments.authorId))
+    .where(eq(schema.comments.ticketId, input.ticketId))
+    .orderBy(asc(schema.comments.createdAt))
+    .all();
 }
