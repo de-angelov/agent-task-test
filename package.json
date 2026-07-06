@@ -8,6 +8,7 @@
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "test": "react-router typegen && vitest run",
+    "test:e2e": "playwright test",
     "db:migrate": "drizzle-kit migrate",
     "db:seed:dev": "tsx scripts/seed-dev-user.ts"
   },
@@ -27,6 +28,7 @@
     "ts-pattern": "^5.7.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@react-router/dev": "^7.6.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.34",

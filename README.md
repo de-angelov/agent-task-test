@@ -7,9 +7,26 @@ This repository is bootstrapped as a minimal React Router framework-mode applica
 - `npm run dev` starts the development server.
 - `npm run typecheck` generates React Router types and runs TypeScript.
 - `npm test` runs Vitest.
+- `npm run test:e2e` runs Playwright end-to-end tests.
 - `npm run build` builds the production app.
 - `npm run db:migrate` applies Drizzle migrations.
 - `npm run db:seed:dev` creates or refreshes a verified local-only manual QA user, `test@test.com` with password `test`. Run it only for local development databases after migrations.
+
+## End-to-end tests
+
+End-to-end tests live in `tests/e2e/` and run with [Playwright](https://playwright.dev). Before running them the first time, install the browser binary:
+
+```bash
+npx playwright install chromium
+```
+
+Then run the suite:
+
+```bash
+npm run test:e2e
+```
+
+`playwright.config.ts` starts the app with `npm run dev` and reuses an already-running dev server on `http://localhost:5173` if one is present.
 
 ## Branch cleanup
 

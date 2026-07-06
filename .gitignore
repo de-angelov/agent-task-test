@@ -6,3 +6,7 @@ coverage
 local.db
 local.db-*
 .env
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
