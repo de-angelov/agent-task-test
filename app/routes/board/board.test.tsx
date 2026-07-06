@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { renderToString } from "react-dom/server";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
 import { createEpic } from "~/services/epics/epics.server";
@@ -147,6 +147,34 @@ function unwrapActionData<TStatus extends string = "error">(
   };
 }
 
+function stubBoardFetch() {
+  const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const result = unwrapActionData<"success" | "error">(
+      await board.action({
+        request: createAuthenticatedFormRequest(init?.body as FormData),
+      }),
+    );
+
+    return new Response(JSON.stringify(result.data), {
+      status: result.init.status,
+    });
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  return fetchMock;
+}
+
+function stubSuccessfulBoardFetch() {
+  return vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({ message: "Ticket state updated.", status: "success" }),
+        { status: 200 },
+      ),
+  );
+}
+
 beforeAll(async () => {
   process.env.DATABASE_URL = databasePath;
 
@@ -245,6 +273,10 @@ beforeEach(() => {
   database.delete(schema.teams).run();
 
   seedAuthentication();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("board route", () => {
@@ -426,6 +458,155 @@ describe("board route", () => {
       expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
         html.indexOf("<strong>Backlog ticket</strong>"),
       );
+    });
+
+    it("does not render the drag-and-drop placeholder notice", () => {
+      const html = renderToString(<board.BoardView tickets={[]} />);
+
+      expect(html).not.toContain(
+        "Drag-and-drop persistence will connect to backend services later.",
+      );
+    });
+
+    describe("persistTicketDrop", () => {
+      it("submits the update-state intent with the target state and expected timestamp", async () => {
+        const fetchMock = stubSuccessfulBoardFetch();
+        vi.stubGlobal("fetch", fetchMock);
+
+        const outcome = await board.persistTicketDrop({
+          ticketId: "ticket-1",
+          targetState: "done",
+          previousState: "backlog",
+          expectedModifiedAt: "2026-06-30T10:00:00.000Z",
+        });
+
+        expect(outcome).toEqual({ outcome: "persisted" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchMock.mock.calls[0];
+        expect(url).toBe("/board");
+        expect(init?.method).toBe("POST");
+        const body = init?.body as FormData;
+        expect(body.get("intent")).toBe("update-state");
+        expect(body.get("ticketId")).toBe("ticket-1");
+        expect(body.get("state")).toBe("done");
+        expect(body.get("expectedModifiedAt")).toBe("2026-06-30T10:00:00.000Z");
+      });
+
+      it("omits expectedModifiedAt from the request when none is known", async () => {
+        const fetchMock = stubSuccessfulBoardFetch();
+        vi.stubGlobal("fetch", fetchMock);
+
+        await board.persistTicketDrop({
+          ticketId: "ticket-1",
+          targetState: "done",
+          previousState: "backlog",
+          expectedModifiedAt: null,
+        });
+
+        const [, init] = fetchMock.mock.calls[0];
+        const body = init?.body as FormData;
+        expect(body.has("expectedModifiedAt")).toBe(false);
+      });
+
+      it("persists a successful drag through the real board state-update action", async () => {
+        const team = createTeamForTest("Platform");
+        const ticket = createTicketForTest({
+          teamId: team.id,
+          title: "Backlog ticket",
+          type: "feature",
+          state: "backlog",
+        });
+        stubBoardFetch();
+
+        const outcome = await board.persistTicketDrop({
+          ticketId: ticket.id,
+          targetState: "done",
+          previousState: "backlog",
+          expectedModifiedAt: ticket.modifiedAt,
+        });
+
+        expect(outcome).toEqual({ outcome: "persisted" });
+        expect(
+          database.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get(),
+        ).toMatchObject({ state: "done" });
+      });
+
+      it("returns a rollback outcome with the server error message when the action rejects the move", async () => {
+        const team = createTeamForTest("Platform");
+        const ticket = createTicketForTest({
+          teamId: team.id,
+          title: "Backlog ticket",
+          type: "feature",
+          state: "backlog",
+        });
+        stubBoardFetch();
+
+        const outcome = await board.persistTicketDrop({
+          ticketId: ticket.id,
+          targetState: "done",
+          previousState: "backlog",
+          expectedModifiedAt: "2020-01-01T00:00:00.000Z",
+        });
+
+        expect(outcome).toEqual({
+          outcome: "rolled-back",
+          ticketId: ticket.id,
+          previousState: "backlog",
+          message: "Ticket was updated elsewhere. Reload and try again.",
+        });
+        expect(
+          database.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get(),
+        ).toMatchObject({ state: "backlog" });
+      });
+
+      it("returns a generic rollback outcome when the persistence request itself fails", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => {
+            throw new Error("network down");
+          }),
+        );
+
+        const outcome = await board.persistTicketDrop({
+          ticketId: "ticket-1",
+          targetState: "done",
+          previousState: "backlog",
+          expectedModifiedAt: null,
+        });
+
+        expect(outcome).toEqual({
+          outcome: "rolled-back",
+          ticketId: "ticket-1",
+          previousState: "backlog",
+          message: "Unable to save the ticket move. Try again.",
+        });
+      });
+    });
+
+    it("reflects a persisted drag move in the board loader after a refresh", async () => {
+      const team = createTeamForTest("Platform");
+      const ticket = createTicketForTest({
+        teamId: team.id,
+        title: "Backlog ticket",
+        type: "feature",
+        state: "backlog",
+      });
+
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            intent: "update-state",
+            ticketId: ticket.id,
+            state: "done",
+          }),
+        ),
+      });
+
+      const data = await board.loader({
+        request: createAuthenticatedRequest(`http://example.com/board?teamId=${team.id}`),
+      });
+
+      expect(data.tickets).toMatchObject([{ id: ticket.id, state: "done" }]);
     });
   });
 
