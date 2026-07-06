@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { useActionData, useLoaderData } from "react-router";
 import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
+import { Dialog } from "~/components/dialog";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import type { CommentReadModel } from "~/services/comments/comments.server";
 import type { TicketReadModel } from "~/services/tickets/tickets.server";
@@ -162,19 +164,52 @@ function TicketComments({
   );
 }
 
-function AddCommentForm() {
+function AddCommentDialogEntry({
+  actionData,
+}: {
+  actionData?: TicketAddCommentActionData;
+}) {
+  const [isOpen, setIsOpen] = useState(Boolean(actionData));
+  const formId = "add-comment-form";
+
+  useEffect(() => {
+    if (actionData) {
+      setIsOpen(true);
+    }
+  }, [actionData]);
+
   return (
-    <form className="form-panel" method="post">
-      <h2>Add comment</h2>
-      <input name="intent" type="hidden" value="add-comment" />
-      <label className="form-field">
-        <span>Comment</span>
-        <textarea name="body" rows={4} />
-      </label>
-      <Button type="submit" variant="primary">
-        Add comment
-      </Button>
-    </form>
+    <>
+      <Button onClick={() => setIsOpen(true)}>Add comment</Button>
+      <Dialog
+        cancelAction={
+          <Button onClick={() => setIsOpen(false)} variant="secondary">
+            Cancel
+          </Button>
+        }
+        confirmAction={
+          <Button form={formId} type="submit" variant="primary">
+            Add comment
+          </Button>
+        }
+        isOpen={isOpen}
+        onCancel={() => setIsOpen(false)}
+        title="Add comment"
+      >
+        {actionData ? (
+          <p className="placeholder-notice" role="alert">
+            {actionData.message}
+          </p>
+        ) : null}
+        <form className="form-panel" id={formId} method="post">
+          <input name="intent" type="hidden" value="add-comment" />
+          <label className="form-field">
+            <span>Comment</span>
+            <textarea name="body" rows={4} />
+          </label>
+        </form>
+      </Dialog>
+    </>
   );
 }
 
@@ -189,11 +224,16 @@ export function TicketDetailsView({
     | TicketDeleteCommentActionData;
   data: LoaderData;
 }) {
+  const addCommentActionData =
+    actionData?.intent === "add-comment" ? actionData : undefined;
+  const otherActionData =
+    actionData && actionData.intent !== "add-comment" ? actionData : undefined;
+
   return (
     <ScreenShell title="Ticket details" userEmail={data.userEmail}>
-      {actionData ? (
+      {otherActionData ? (
         <p className="placeholder-notice" role="alert">
-          {actionData.message}
+          {otherActionData.message}
         </p>
       ) : null}
       {data.status === "found" ? (
@@ -216,7 +256,7 @@ export function TicketDetailsView({
             comments={data.comments}
             currentUserId={data.currentUserId}
           />
-          <AddCommentForm />
+          <AddCommentDialogEntry actionData={addCommentActionData} />
         </>
       ) : (
         <p role="status">Ticket {data.ticketId} was not found.</p>
