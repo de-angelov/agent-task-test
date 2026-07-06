@@ -1,5 +1,5 @@
 import { data, useActionData, useLoaderData } from "react-router";
-import { useEffect, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
@@ -22,7 +22,7 @@ import {
 } from "~/services/tickets/tickets.server";
 import { listTeams, type AppDb, type Team } from "~/services/teams/teams.server";
 
-import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
+import { ScreenShell } from "../placeholders/placeholder-ui";
 import {
   handleTicketCreateAction,
   type TicketCreateActionData,
@@ -60,6 +60,42 @@ export function moveTicketState(
       ? { ...ticket, state: targetState }
       : ticket,
   );
+}
+
+export type TicketDropOutcome =
+  | { outcome: "persisted" }
+  | { outcome: "rolled-back"; ticketId: string; previousState: TicketState; message: string };
+
+export async function persistTicketDrop(input: {
+  ticketId: string;
+  targetState: TicketState;
+  previousState: TicketState;
+  expectedModifiedAt: string | null;
+}): Promise<TicketDropOutcome> {
+  const rollback = (message: string): TicketDropOutcome => ({
+    outcome: "rolled-back",
+    ticketId: input.ticketId,
+    previousState: input.previousState,
+    message,
+  });
+
+  const formData = new FormData();
+  formData.set("intent", "update-state");
+  formData.set("ticketId", input.ticketId);
+  formData.set("state", input.targetState);
+
+  if (input.expectedModifiedAt !== null) {
+    formData.set("expectedModifiedAt", input.expectedModifiedAt);
+  }
+
+  try {
+    const response = await fetch("/board", { method: "POST", body: formData });
+    const result = (await response.json()) as TicketStateUpdateActionData;
+
+    return result.status === "error" ? rollback(result.message) : { outcome: "persisted" };
+  } catch {
+    return rollback("Unable to save the ticket move. Try again.");
+  }
 }
 
 export type BoardFilters = {
@@ -227,6 +263,10 @@ export function BoardView({
   actionData?: TicketCreateActionData;
 } = {}) {
   const [localTickets, setLocalTickets] = useState(tickets);
+  const [dragError, setDragError] = useState<string | null>(null);
+  // Tracks the newest in-flight persistence request per ticket so a slow or
+  // failed request can't roll back a move that a later drag already applied.
+  const latestDragRequestRef = useRef(new Map<string, number>());
 
   useEffect(() => {
     setLocalTickets(tickets);
@@ -245,16 +285,46 @@ export function BoardView({
       return;
     }
 
+    const ticket = localTickets.find((candidate) => candidate.id === ticketId);
+
+    if (!ticket || ticket.state === targetState) {
+      return;
+    }
+
+    const previousState = ticket.state;
+    const requestId = (latestDragRequestRef.current.get(ticketId) ?? 0) + 1;
+    latestDragRequestRef.current.set(ticketId, requestId);
+
+    setDragError(null);
     setLocalTickets((currentTickets) =>
       moveTicketState(currentTickets, ticketId, targetState),
     );
+
+    void persistTicketDrop({
+      ticketId,
+      targetState,
+      previousState,
+      expectedModifiedAt: null,
+    }).then((outcome) => {
+      const isLatestRequestForTicket =
+        latestDragRequestRef.current.get(ticketId) === requestId;
+
+      if (isLatestRequestForTicket && outcome.outcome === "rolled-back") {
+        setLocalTickets((currentTickets) =>
+          moveTicketState(currentTickets, outcome.ticketId, outcome.previousState),
+        );
+        setDragError(outcome.message);
+      }
+    });
   }
 
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
-      <PlaceholderNotice>
-        Drag-and-drop persistence will connect to backend services later.
-      </PlaceholderNotice>
+      {dragError ? (
+        <p className="placeholder-notice" role="alert">
+          {dragError}
+        </p>
+      ) : null}
       <section className="toolbar" aria-label="Board filters">
         <form className="form-panel" method="get">
           <label className="form-field">
