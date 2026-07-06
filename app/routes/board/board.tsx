@@ -1,5 +1,6 @@
-import { useActionData, useLoaderData } from "react-router";
+import { data, useActionData, useLoaderData } from "react-router";
 import { useEffect, useState } from "react";
+import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
@@ -7,8 +8,14 @@ import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { ticketStates, type TicketState } from "~/services/tickets/ticket-workflow";
-import { listTicketsForTeam, type TicketReadModel } from "~/services/tickets/tickets.server";
-import { listTeams, type Team } from "~/services/teams/teams.server";
+import {
+  getTicketById,
+  listTicketsForTeam,
+  mapTicketUpdateError,
+  updateTicket,
+  type TicketReadModel,
+} from "~/services/tickets/tickets.server";
+import { listTeams, type AppDb, type Team } from "~/services/teams/teams.server";
 
 import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
 import {
@@ -72,8 +79,76 @@ export async function loader({ request }: { request: Request }) {
 
 export async function action({ request }: { request: Request }) {
   const user = await requireAuthenticatedUser(request);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
 
-  return handleTicketCreateAction(db, user.id, await request.formData());
+  return match(intent)
+    .with("update-state", () => handleTicketStateUpdateAction(db, formData))
+    .otherwise(() => handleTicketCreateAction(db, user.id, formData));
+}
+
+export type TicketStateUpdateActionData = {
+  message: string;
+  status: "error" | "success";
+};
+
+function handleTicketStateUpdateAction(database: AppDb, formData: FormData) {
+  const ticketId = String(formData.get("ticketId") ?? "");
+  const existingTicket = getTicketById(database, { id: ticketId });
+
+  if (existingTicket.isErr()) {
+    return data<TicketStateUpdateActionData>(
+      { message: "Ticket not found.", status: "error" },
+      { status: 404 },
+    );
+  }
+
+  const expectedModifiedAt = normalizeOptionalFormValue(
+    formData.get("expectedModifiedAt"),
+  );
+
+  if (
+    expectedModifiedAt !== null &&
+    expectedModifiedAt !== existingTicket.value.modifiedAt
+  ) {
+    return data<TicketStateUpdateActionData>(
+      {
+        message: "Ticket was updated elsewhere. Reload and try again.",
+        status: "error",
+      },
+      { status: 409 },
+    );
+  }
+
+  const result = updateTicket(database, {
+    id: ticketId,
+    teamId: existingTicket.value.teamId,
+    epicId: existingTicket.value.epicId,
+    title: existingTicket.value.title,
+    body: existingTicket.value.body,
+    type: existingTicket.value.type,
+    state: String(formData.get("state") ?? ""),
+  });
+
+  if (result.isErr()) {
+    const status = result.error === "not-found" ? 404 : 400;
+
+    return data<TicketStateUpdateActionData>(
+      { message: mapTicketUpdateError(result.error), status: "error" },
+      { status },
+    );
+  }
+
+  return data<TicketStateUpdateActionData>(
+    { message: "Ticket state updated.", status: "success" },
+    { status: 200 },
+  );
+}
+
+function normalizeOptionalFormValue(value: FormDataEntryValue | null) {
+  const normalizedValue = String(value ?? "").trim();
+
+  return normalizedValue === "" ? null : normalizedValue;
 }
 
 export function BoardView({
