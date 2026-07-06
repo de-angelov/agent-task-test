@@ -167,10 +167,13 @@ function createFormData(values: Record<string, string>) {
   return formData;
 }
 
-function renderDetails(data: Parameters<typeof TicketDetailsView>[0]["data"]) {
+function renderDetails(
+  data: Parameters<typeof TicketDetailsView>[0]["data"],
+  actionData?: Parameters<typeof TicketDetailsView>[0]["actionData"],
+) {
   return renderToString(
     <MemoryRouter>
-      <TicketDetailsView data={data} />
+      <TicketDetailsView actionData={actionData} data={data} />
     </MemoryRouter>,
   );
 }
@@ -294,6 +297,36 @@ describe("ticket details route", () => {
     });
 
     expect(html).toContain("<dt>Epic</dt><dd>No epic</dd>");
+  });
+
+  it("renders delete validation errors returned by the action", () => {
+    const html = renderDetails(
+      {
+        status: "found",
+        ticket: {
+          id: "ticket-1",
+          title: "Create service",
+          body: "Create a focused backend service",
+          type: "feature",
+          state: "todo",
+          teamId: "team-1",
+          teamName: "Platform",
+          epicId: null,
+          epicTitle: null,
+          createdBy: userId,
+          createdByEmail: "user@example.com",
+          createdAt: "2026-06-30T10:00:00.000Z",
+          modifiedAt: "2026-06-30T10:30:00.000Z",
+        },
+      },
+      {
+        message: "Confirm deletion before deleting this ticket.",
+        status: "error",
+      },
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Confirm deletion before deleting this ticket.");
   });
 
   it.each([
