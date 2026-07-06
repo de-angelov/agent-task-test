@@ -7,7 +7,11 @@ import * as schema from "~/db/schema";
 
 import { createTeam, type AppDb } from "../teams/teams.server";
 import { createTicket } from "../tickets/tickets.server";
-import { addTicketComment, normalizeCommentBody } from "./comments.server";
+import {
+  addTicketComment,
+  listTicketComments,
+  normalizeCommentBody,
+} from "./comments.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 
@@ -182,5 +186,87 @@ describe("comment service", () => {
       .get();
 
     expect(persistedTicket?.modifiedAt).toBe(ticket.modifiedAt);
+  });
+});
+
+describe("listTicketComments", () => {
+  it("returns an empty list for a ticket without comments", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    expect(listTicketComments(database, { ticketId: ticket.id })).toEqual([]);
+  });
+
+  it("returns comments oldest first with joined author email", () => {
+    database
+      .insert(schema.users)
+      .values({
+        id: "user-2",
+        email: "reviewer@example.com",
+        passwordHash: "hash",
+        createdAt: now.getTime(),
+      })
+      .run();
+
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const first = addTicketComment(
+      database,
+      { ticketId: ticket.id, authorId: "user-1", body: "First" },
+      { now: () => new Date("2026-06-30T10:00:00.000Z") },
+    )._unsafeUnwrap();
+
+    const second = addTicketComment(
+      database,
+      { ticketId: ticket.id, authorId: "user-2", body: "Second" },
+      { now: () => new Date("2026-06-30T11:00:00.000Z") },
+    )._unsafeUnwrap();
+
+    const comments = listTicketComments(database, { ticketId: ticket.id });
+
+    expect(comments).toEqual([
+      {
+        id: first.id,
+        ticketId: ticket.id,
+        authorId: "user-1",
+        authorEmail: "user@example.com",
+        body: "First",
+        createdAt: first.createdAt,
+      },
+      {
+        id: second.id,
+        ticketId: ticket.id,
+        authorId: "user-2",
+        authorEmail: "reviewer@example.com",
+        body: "Second",
+        createdAt: second.createdAt,
+      },
+    ]);
+  });
+
+  it("isolates comments by ticket", () => {
+    const team = createTeamForTest();
+    const ticketOne = createTicketForTest(team.id);
+    const ticketTwo = createTicketForTest(team.id);
+
+    addTicketComment(database, {
+      ticketId: ticketOne.id,
+      authorId: "user-1",
+      body: "On ticket one",
+    })._unsafeUnwrap();
+
+    addTicketComment(database, {
+      ticketId: ticketTwo.id,
+      authorId: "user-1",
+      body: "On ticket two",
+    })._unsafeUnwrap();
+
+    const commentsForTicketOne = listTicketComments(database, {
+      ticketId: ticketOne.id,
+    });
+
+    expect(commentsForTicketOne).toHaveLength(1);
+    expect(commentsForTicketOne[0]?.body).toBe("On ticket one");
   });
 });
