@@ -1,11 +1,16 @@
-import { useLoaderData } from "react-router";
+import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
 import { db } from "~/db/client.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 
-import { readTicketEdit, type LoaderData } from "./edit.server";
+import {
+  handleTicketEditAction,
+  readTicketEdit,
+  type LoaderData,
+  type TicketEditActionData,
+} from "./edit.server";
 import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
@@ -25,15 +30,30 @@ export async function loader({ request, params }: LoaderArgs) {
   return readTicketEdit(db, params.ticketId ?? "", user.email);
 }
 
-export async function action({ request }: { request: Request }) {
+export async function action({ request, params }: LoaderArgs) {
   await requireAuthenticatedUser(request);
 
-  return null;
+  return handleTicketEditAction(
+    db,
+    params.ticketId ?? "",
+    await request.formData(),
+  );
 }
 
-export function TicketEditView({ data }: { data: LoaderData }) {
+export function TicketEditView({
+  actionData,
+  data,
+}: {
+  actionData?: TicketEditActionData;
+  data: LoaderData;
+}) {
   return (
     <ScreenShell title="Edit ticket" userEmail={data.userEmail}>
+      {actionData ? (
+        <p className="placeholder-notice" role="alert">
+          {actionData.message}
+        </p>
+      ) : null}
       {data.status === "not-found" ? (
         <p role="status">Ticket {data.ticketId} was not found.</p>
       ) : (
@@ -97,6 +117,7 @@ export function TicketEditView({ data }: { data: LoaderData }) {
 
 export default function TicketEdit() {
   const data = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
 
-  return <TicketEditView data={data} />;
+  return <TicketEditView actionData={actionData} data={data} />;
 }

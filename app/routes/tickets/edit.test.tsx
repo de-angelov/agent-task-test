@@ -9,7 +9,8 @@ import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
 
-import { loader, TicketEditView } from "./edit";
+import { handleTicketEditAction } from "./edit.server";
+import { action, loader, TicketEditView } from "./edit";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 const userId = "user-1";
@@ -138,6 +139,38 @@ async function createAuthedRequest(ticketId?: string) {
       Cookie: cookie,
     },
   });
+}
+
+async function createAuthedFormRequest(
+  ticketId: string,
+  values: Record<string, string> = {},
+) {
+  const cookie = await createSessionCookie(sessionId);
+
+  return new Request(`http://example.com/tickets/${ticketId}/edit`, {
+    body: createFormData(values),
+    headers: {
+      Cookie: cookie,
+    },
+    method: "POST",
+  });
+}
+
+function createFormData(values: Record<string, string>) {
+  const formData = new FormData();
+
+  for (const [key, value] of Object.entries(values)) {
+    formData.set(key, value);
+  }
+
+  return formData;
+}
+
+function unwrapActionData(result: ReturnType<typeof handleTicketEditAction>) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
+  };
 }
 
 function createTeamForTest(name = "Platform") {
@@ -299,5 +332,194 @@ describe("ticket edit route", () => {
     ).rejects.toMatchObject({
       status: 302,
     });
+  });
+
+  it("requires authentication before saving ticket edits", async () => {
+    await expect(
+      action({
+        request: new Request("http://example.com/tickets/ticket-1/edit", {
+          body: createFormData({}),
+          method: "POST",
+        }),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("updates a ticket and redirects to ticket details on success", () => {
+    const team = createTeamForTest();
+    const epic = createEpicForTest(team.id);
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = handleTicketEditAction(
+      database,
+      ticket.id,
+      createFormData({
+        body: "Updated body",
+        epicId: epic.id,
+        state: "todo",
+        teamId: team.id,
+        title: "Updated title",
+        type: "bug",
+      }),
+    ) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database.select().from(schema.tickets).get(),
+    ).toMatchObject({
+      body: "Updated body",
+      epicId: epic.id,
+      state: "todo",
+      title: "Updated title",
+      type: "bug",
+    });
+  });
+
+  it("returns a validation error when the ticket title is empty", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = unwrapActionData(
+      handleTicketEditAction(
+        database,
+        ticket.id,
+        createFormData({
+          body: "Updated body",
+          state: "backlog",
+          teamId: team.id,
+          title: "   ",
+          type: "feature",
+        }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket title is required.",
+      status: "error",
+    });
+  });
+
+  it("returns a validation error when the ticket is missing", () => {
+    const team = createTeamForTest();
+
+    const result = unwrapActionData(
+      handleTicketEditAction(
+        database,
+        "missing-ticket",
+        createFormData({
+          body: "Updated body",
+          state: "backlog",
+          teamId: team.id,
+          title: "Updated title",
+          type: "feature",
+        }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket not found.",
+      status: "error",
+    });
+  });
+
+  it("returns a validation error when the epic belongs to a different team", () => {
+    const team = createTeamForTest("Platform");
+    const otherTeam = createTeamForTest("Product");
+    const otherTeamEpic = createEpicForTest(otherTeam.id, "Product Discovery");
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = unwrapActionData(
+      handleTicketEditAction(
+        database,
+        ticket.id,
+        createFormData({
+          body: "Updated body",
+          epicId: otherTeamEpic.id,
+          state: "backlog",
+          teamId: team.id,
+          title: "Updated title",
+          type: "feature",
+        }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Epic must belong to the ticket team.",
+      status: "error",
+    });
+  });
+
+  it("redirects from the authenticated edit route action after saving", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = (await action({
+      request: await createAuthedFormRequest(ticket.id, {
+        body: "Updated through route",
+        state: "backlog",
+        teamId: team.id,
+        title: "Updated through route",
+        type: "feature",
+      }),
+      params: {
+        ticketId: ticket.id,
+      },
+    })) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
   });
 });
