@@ -479,6 +479,251 @@ describe("board route", () => {
     });
   });
 
+  describe("parseBoardFilters", () => {
+    it("returns no active filters for an empty query", () => {
+      expect(board.parseBoardFilters(new URLSearchParams())).toEqual({
+        type: null,
+        epicId: null,
+        search: "",
+      });
+    });
+
+    it("parses a valid ticket type", () => {
+      expect(
+        board.parseBoardFilters(new URLSearchParams({ type: "bug" })),
+      ).toMatchObject({ type: "bug" });
+    });
+
+    it("ignores an invalid ticket type value", () => {
+      expect(
+        board.parseBoardFilters(new URLSearchParams({ type: "not-a-type" })),
+      ).toMatchObject({ type: null });
+    });
+
+    it("treats a blank epic id as no filter", () => {
+      expect(
+        board.parseBoardFilters(new URLSearchParams({ epicId: "   " })),
+      ).toMatchObject({ epicId: null });
+    });
+
+    it("trims search text", () => {
+      expect(
+        board.parseBoardFilters(new URLSearchParams({ search: "  ticket  " })),
+      ).toMatchObject({ search: "ticket" });
+    });
+  });
+
+  describe("filterTickets", () => {
+    const featureTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Add login page",
+      state: "backlog",
+      type: "feature",
+      epicTitle: "Platform Launch",
+    });
+    const bugTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Fix login redirect",
+      state: "todo",
+      type: "bug",
+    });
+
+    it("filters by ticket type", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: "bug",
+          epicId: null,
+          search: "",
+        }),
+      ).toEqual([bugTicket]);
+    });
+
+    it("filters by epic", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: null,
+          epicId: "epic-1",
+          search: "",
+        }),
+      ).toEqual([featureTicket]);
+    });
+
+    it("filters by a case-insensitive title search", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: null,
+          epicId: null,
+          search: "LOGIN",
+        }),
+      ).toEqual([featureTicket, bugTicket]);
+    });
+
+    it("combines active filters using AND logic", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: "bug",
+          epicId: null,
+          search: "login",
+        }),
+      ).toEqual([bugTicket]);
+
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: "feature",
+          epicId: null,
+          search: "redirect",
+        }),
+      ).toEqual([]);
+    });
+
+    it("returns no tickets for an epic id that does not match any ticket", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: null,
+          epicId: "missing-epic",
+          search: "",
+        }),
+      ).toEqual([]);
+    });
+
+    it("preserves ticket ordering from the loader when filtering", () => {
+      expect(
+        board.filterTickets([bugTicket, featureTicket], {
+          type: null,
+          epicId: null,
+          search: "login",
+        }),
+      ).toEqual([bugTicket, featureTicket]);
+    });
+
+    it("returns all tickets unfiltered for default/clear query state", () => {
+      expect(
+        board.filterTickets([featureTicket, bugTicket], {
+          type: null,
+          epicId: null,
+          search: "",
+        }),
+      ).toEqual([featureTicket, bugTicket]);
+    });
+  });
+
+  it("applies the ticket type query filter in the board loader", async () => {
+    const team = createTeamForTest("Platform");
+    createTicketForTest({
+      teamId: team.id,
+      title: "Feature ticket",
+      type: "feature",
+      state: "backlog",
+    });
+    const bugTicket = createTicketForTest({
+      teamId: team.id,
+      title: "Bug ticket",
+      type: "bug",
+      state: "todo",
+    });
+
+    const data = await board.loader({
+      request: createAuthenticatedRequest(
+        `http://example.com/board?teamId=${team.id}&type=bug`,
+      ),
+    });
+
+    expect(data.tickets).toMatchObject([{ id: bugTicket.id, type: "bug" }]);
+  });
+
+  it("applies the epic query filter in the board loader", async () => {
+    const team = createTeamForTest("Platform");
+    const epic = createEpicForTest(team.id, "Platform Launch");
+    const epicTicket = createTicketForTest({
+      teamId: team.id,
+      epicId: epic.id,
+      title: "Epic ticket",
+      type: "feature",
+      state: "backlog",
+    });
+    createTicketForTest({
+      teamId: team.id,
+      title: "Unplanned ticket",
+      type: "feature",
+      state: "backlog",
+    });
+
+    const data = await board.loader({
+      request: createAuthenticatedRequest(
+        `http://example.com/board?teamId=${team.id}&epicId=${epic.id}`,
+      ),
+    });
+
+    expect(data.tickets).toMatchObject([{ id: epicTicket.id }]);
+  });
+
+  it("applies the search query filter case-insensitively in the board loader", async () => {
+    const team = createTeamForTest("Platform");
+    const matchingTicket = createTicketForTest({
+      teamId: team.id,
+      title: "Fix login redirect",
+      type: "bug",
+      state: "todo",
+    });
+    createTicketForTest({
+      teamId: team.id,
+      title: "Unrelated ticket",
+      type: "bug",
+      state: "todo",
+    });
+
+    const data = await board.loader({
+      request: createAuthenticatedRequest(
+        `http://example.com/board?teamId=${team.id}&search=LOGIN`,
+      ),
+    });
+
+    expect(data.tickets).toMatchObject([{ id: matchingTicket.id }]);
+  });
+
+  it("ignores an invalid ticket type query value in the board loader", async () => {
+    const team = createTeamForTest("Platform");
+    const ticket = createTicketForTest({
+      teamId: team.id,
+      title: "Feature ticket",
+      type: "feature",
+      state: "backlog",
+    });
+
+    const data = await board.loader({
+      request: createAuthenticatedRequest(
+        `http://example.com/board?teamId=${team.id}&type=not-a-type`,
+      ),
+    });
+
+    expect(data.tickets).toMatchObject([{ id: ticket.id }]);
+  });
+
+  it("returns all selected-team tickets when no filter query is present", async () => {
+    const team = createTeamForTest("Platform");
+    const firstTicket = createTicketForTest({
+      teamId: team.id,
+      title: "First ticket",
+      type: "feature",
+      state: "backlog",
+    });
+    const secondTicket = createTicketForTest({
+      teamId: team.id,
+      title: "Second ticket",
+      type: "bug",
+      state: "todo",
+    });
+
+    const data = await board.loader({
+      request: createAuthenticatedRequest(`http://example.com/board?teamId=${team.id}`),
+    });
+
+    expect(data.tickets).toMatchObject([
+      { id: firstTicket.id },
+      { id: secondTicket.id },
+    ]);
+  });
+
   it("selects the first team when no team is requested", async () => {
     const platform = createTeamForTest("Platform");
     const product = createTeamForTest("Product");

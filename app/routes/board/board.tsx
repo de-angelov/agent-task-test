@@ -7,7 +7,12 @@ import { Dialog } from "~/components/dialog";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
-import { ticketStates, type TicketState } from "~/services/tickets/ticket-workflow";
+import {
+  ticketStates,
+  ticketTypes,
+  type TicketState,
+  type TicketType,
+} from "~/services/tickets/ticket-workflow";
 import {
   getTicketById,
   listTicketsForTeam,
@@ -44,6 +49,48 @@ export function getBoardColumns(tickets: TicketReadModel[]): BoardColumn[] {
   }));
 }
 
+export type BoardFilters = {
+  type: TicketType | null;
+  epicId: string | null;
+  search: string;
+};
+
+export function parseBoardFilters(searchParams: URLSearchParams): BoardFilters {
+  const requestedType = searchParams.get("type");
+  const type = ticketTypes.find((ticketType) => ticketType === requestedType) ?? null;
+  const requestedEpicId = (searchParams.get("epicId") ?? "").trim();
+  const search = (searchParams.get("search") ?? "").trim();
+
+  return {
+    type,
+    epicId: requestedEpicId === "" ? null : requestedEpicId,
+    search,
+  };
+}
+
+export function filterTickets(
+  tickets: TicketReadModel[],
+  filters: BoardFilters,
+): TicketReadModel[] {
+  const normalizedSearch = filters.search.toLowerCase();
+
+  return tickets.filter((ticket) => {
+    if (filters.type !== null && ticket.type !== filters.type) {
+      return false;
+    }
+
+    if (filters.epicId !== null && ticket.epicId !== filters.epicId) {
+      return false;
+    }
+
+    if (normalizedSearch !== "" && !ticket.title.toLowerCase().includes(normalizedSearch)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function meta() {
   return [{ title: "Kanban Board" }];
 }
@@ -67,12 +114,13 @@ export async function loader({ request }: { request: Request }) {
 
   const epics = listEpics(db, { teamId: selectedTeamId });
   const tickets = listTicketsForTeam(db, { teamId: selectedTeamId });
+  const filters = parseBoardFilters(new URL(request.url).searchParams);
 
   return {
     teams,
     selectedTeamId,
     epics,
-    tickets,
+    tickets: filterTickets(tickets, filters),
     userEmail: user.email,
   } satisfies LoaderData;
 }
