@@ -60,6 +60,7 @@ export type TicketEditActionData = {
 export function handleTicketEditAction(
   database: AppDb,
   ticketId: string,
+  actorId: string,
   formData: FormData,
 ) {
   const result = updateTicket(database, {
@@ -70,6 +71,7 @@ export function handleTicketEditAction(
     body: String(formData.get("body") ?? ""),
     type: String(formData.get("type") ?? ""),
     state: String(formData.get("state") ?? ""),
+    actorId,
   });
 
   if (result.isErr()) {

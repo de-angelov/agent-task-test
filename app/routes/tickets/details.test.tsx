@@ -123,6 +123,17 @@ beforeEach(() => {
       FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE ON UPDATE CASCADE,
       FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
+
+    CREATE TABLE ticket_activity (
+      id text PRIMARY KEY NOT NULL,
+      ticket_id text NOT NULL,
+      actor_id text NOT NULL,
+      action_type text NOT NULL,
+      detail text,
+      created_at text NOT NULL,
+      FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
+    );
   `);
 
   database = drizzle(sqlite, { schema });
@@ -846,7 +857,7 @@ describe("ticket details route", () => {
     )._unsafeUnwrap();
 
     const result = unwrapActionData(
-      handleTicketDeleteAction(database, ticket.id, createFormData({})),
+      handleTicketDeleteAction(database, ticket.id, userId, createFormData({})),
     );
 
     expect(result.init.status).toBe(400);
@@ -881,6 +892,7 @@ describe("ticket details route", () => {
     const result = handleTicketDeleteAction(
       database,
       ticket.id,
+      userId,
       createFormData({ confirmDelete: "yes" }),
     ) as Response;
 
@@ -889,11 +901,44 @@ describe("ticket details route", () => {
     expect(database.select().from(schema.tickets).get()).toBeUndefined();
   });
 
+  it("records a deleted ticket activity entry before the ticket and its history are removed", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Delete ticket",
+        body: "Delete after confirmation",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    handleTicketDeleteAction(
+      database,
+      ticket.id,
+      userId,
+      createFormData({ confirmDelete: "yes" }),
+    );
+
+    expect(database.select().from(schema.tickets).get()).toBeUndefined();
+    expect(
+      database
+        .select()
+        .from(schema.ticketActivity)
+        .where(eq(schema.ticketActivity.ticketId, ticket.id))
+        .all(),
+    ).toEqual([]);
+  });
+
   it("returns a validation error when the confirmed ticket is missing", () => {
     const result = unwrapActionData(
       handleTicketDeleteAction(
         database,
         "missing-ticket",
+        userId,
         createFormData({ confirmDelete: "yes" }),
       ),
     );

@@ -87,6 +87,7 @@ export function readTicketDetails(
 export function handleTicketDeleteAction(
   database: AppDb,
   ticketId: string,
+  actorId: string,
   formData: FormData,
 ) {
   if (formData.get("confirmDelete") !== "yes") {
@@ -100,7 +101,7 @@ export function handleTicketDeleteAction(
     );
   }
 
-  const result = deleteTicket(database, { id: ticketId });
+  const result = deleteTicket(database, { id: ticketId, actorId });
 
   if (result.isErr()) {
     return data<TicketDeleteActionData>(

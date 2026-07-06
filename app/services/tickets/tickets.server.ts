@@ -10,6 +10,7 @@ import {
   type Clock,
 } from "~/lib/timestamps.server";
 
+import { recordTicketActivity } from "../ticket-activity/ticket-activity.server";
 import type { AppDb } from "../teams/teams.server";
 import {
   ticketStates,
@@ -49,7 +50,7 @@ export type TicketCreateError =
 
 export type TicketReadError = "not-found";
 
-export type TicketDeleteError = "not-found";
+export type TicketDeleteError = "actor-not-found" | "not-found";
 
 export type TicketUpdateError =
   | "empty-body"
@@ -243,21 +244,90 @@ export function listTicketsForTeam(
 
 export function deleteTicket(
   database: AppDb,
-  input: { id: string },
+  input: { id: string; actorId: string },
+  clock: Clock = systemClock,
 ): Result<void, TicketDeleteError> {
-  const ticket = database
-    .select({ id: schema.tickets.id })
-    .from(schema.tickets)
-    .where(eq(schema.tickets.id, input.id))
-    .get();
+  const activity = recordTicketActivity(
+    database,
+    { ticketId: input.id, actorId: input.actorId, actionType: "deleted" },
+    clock,
+  );
 
-  if (!ticket) {
-    return err("not-found");
+  if (activity.isErr()) {
+    return err(activity.error === "actor-not-found" ? "actor-not-found" : "not-found");
   }
 
   database.delete(schema.tickets).where(eq(schema.tickets.id, input.id)).run();
 
   return ok(undefined);
+}
+
+function recordTicketFieldChanges(
+  database: AppDb,
+  actorId: string,
+  before: Ticket,
+  after: Ticket,
+  clock: Clock,
+) {
+  if (before.state !== after.state) {
+    recordTicketActivity(
+      database,
+      {
+        ticketId: after.id,
+        actorId,
+        actionType: "state-changed",
+        detail: `${before.state} -> ${after.state}`,
+      },
+      clock,
+    );
+  }
+
+  if (before.title !== after.title) {
+    recordTicketActivity(
+      database,
+      {
+        ticketId: after.id,
+        actorId,
+        actionType: "title-changed",
+        detail: `${before.title} -> ${after.title}`,
+      },
+      clock,
+    );
+  }
+
+  if (before.body !== after.body) {
+    recordTicketActivity(
+      database,
+      { ticketId: after.id, actorId, actionType: "body-changed" },
+      clock,
+    );
+  }
+
+  if (before.teamId !== after.teamId) {
+    recordTicketActivity(
+      database,
+      {
+        ticketId: after.id,
+        actorId,
+        actionType: "team-changed",
+        detail: `${before.teamId} -> ${after.teamId}`,
+      },
+      clock,
+    );
+  }
+
+  if (before.epicId !== after.epicId) {
+    recordTicketActivity(
+      database,
+      {
+        ticketId: after.id,
+        actorId,
+        actionType: "epic-changed",
+        detail: `${before.epicId ?? "none"} -> ${after.epicId ?? "none"}`,
+      },
+      clock,
+    );
+  }
 }
 
 export function updateTicket(
@@ -270,6 +340,7 @@ export function updateTicket(
     body: string;
     type: string;
     state: string;
+    actorId?: string;
   },
   clock: Clock = systemClock,
 ): Result<Ticket, TicketUpdateError> {
@@ -374,6 +445,10 @@ export function updateTicket(
     .where(eq(schema.tickets.id, input.id))
     .run();
 
+  if (input.actorId) {
+    recordTicketFieldChanges(database, input.actorId, ticket, updatedTicket, clock);
+  }
+
   return ok(updatedTicket);
 }
 
@@ -404,5 +479,8 @@ export function mapTicketUpdateError(error: TicketUpdateError) {
 }
 
 export function mapTicketDeleteError(error: TicketDeleteError) {
-  return match(error).with("not-found", () => "Ticket not found.").exhaustive();
+  return match(error)
+    .with("not-found", () => "Ticket not found.")
+    .with("actor-not-found", () => "Unable to delete ticket.")
+    .exhaustive();
 }

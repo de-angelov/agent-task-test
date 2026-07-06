@@ -60,7 +60,7 @@ export async function action({ request, params }: LoaderArgs) {
     .with("delete-comment", () =>
       handleTicketDeleteCommentAction(db, ticketId, user.id, formData),
     )
-    .otherwise(() => handleTicketDeleteAction(db, ticketId, formData));
+    .otherwise(() => handleTicketDeleteAction(db, ticketId, user.id, formData));
 }
 
 function getStateLabel(state: TicketReadModel["state"]) {
