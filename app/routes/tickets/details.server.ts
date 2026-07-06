@@ -36,21 +36,25 @@ export type TicketDetailsNotFound = {
 export type LoaderData = TicketDetailsFound | TicketDetailsNotFound;
 
 export type TicketDeleteActionData = {
+  intent: "delete-ticket";
   message: string;
   status: "error";
 };
 
 export type TicketAddCommentActionData = {
+  intent: "add-comment";
   message: string;
   status: "error";
 };
 
 export type TicketEditCommentActionData = {
+  intent: "edit-comment";
   message: string;
   status: "error";
 };
 
 export type TicketDeleteCommentActionData = {
+  intent: "delete-comment";
   message: string;
   status: "error";
 };
@@ -88,6 +92,7 @@ export function handleTicketDeleteAction(
   if (formData.get("confirmDelete") !== "yes") {
     return data<TicketDeleteActionData>(
       {
+        intent: "delete-ticket",
         message: "Confirm deletion before deleting this ticket.",
         status: "error",
       },
@@ -99,7 +104,11 @@ export function handleTicketDeleteAction(
 
   if (result.isErr()) {
     return data<TicketDeleteActionData>(
-      { message: mapTicketDeleteError(result.error), status: "error" },
+      {
+        intent: "delete-ticket",
+        message: mapTicketDeleteError(result.error),
+        status: "error",
+      },
       { status: 400 },
     );
   }
@@ -129,7 +138,11 @@ export function handleTicketAddCommentAction(
 
   if (result.isErr()) {
     return data<TicketAddCommentActionData>(
-      { message: mapCommentAddError(result.error), status: "error" },
+      {
+        intent: "add-comment",
+        message: mapCommentAddError(result.error),
+        status: "error",
+      },
       { status: 400 },
     );
   }
@@ -170,7 +183,7 @@ export function handleTicketEditCommentAction(
     const { message, statusCode } = mapCommentEditError(result.error);
 
     return data<TicketEditCommentActionData>(
-      { message, status: "error" },
+      { intent: "edit-comment", message, status: "error" },
       { status: statusCode },
     );
   }
@@ -206,7 +219,7 @@ export function handleTicketDeleteCommentAction(
     const { message, statusCode } = mapCommentDeleteError(result.error);
 
     return data<TicketDeleteCommentActionData>(
-      { message, status: "error" },
+      { intent: "delete-comment", message, status: "error" },
       { status: statusCode },
     );
   }
