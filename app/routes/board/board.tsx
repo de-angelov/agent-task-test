@@ -1,16 +1,6 @@
 import { data, useActionData, useLoaderData } from "react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 import { match } from "ts-pattern";
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
@@ -246,20 +236,17 @@ export function BoardView({
   const clearFiltersHref = selectedTeamId
     ? `/board?teamId=${selectedTeamId}`
     : "/board";
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor),
-  );
 
-  function handleDragEnd(event: DragEndEvent) {
-    const targetState = ticketStates.find((state) => state === event.over?.id);
+  function handleTicketDrop(event: DragEvent<HTMLElement>, targetState: TicketState) {
+    event.preventDefault();
+    const ticketId = event.dataTransfer.getData("text/plain");
 
-    if (!targetState) {
+    if (!ticketId) {
       return;
     }
 
     setLocalTickets((currentTickets) =>
-      moveTicketState(currentTickets, String(event.active.id), targetState),
+      moveTicketState(currentTickets, ticketId, targetState),
     );
   }
 
@@ -319,32 +306,38 @@ export function BoardView({
           teams={teams}
         />
       </section>
-      <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
-        <section className="kanban-board" aria-label="Ticket workflow">
-          {columns.map((column) => (
-            <BoardColumnDropZone key={column.state} state={column.state}>
-              {column.tickets.map((ticket) => (
-                <DraggableTicketCard key={ticket.id} ticket={ticket} />
-              ))}
-            </BoardColumnDropZone>
-          ))}
-        </section>
-      </DndContext>
+      <section className="kanban-board" aria-label="Ticket workflow">
+        {columns.map((column) => (
+          <BoardColumnDropZone
+            key={column.state}
+            onDropTicket={handleTicketDrop}
+            state={column.state}
+          >
+            {column.tickets.map((ticket) => (
+              <DraggableTicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </BoardColumnDropZone>
+        ))}
+      </section>
     </ScreenShell>
   );
 }
 
 function BoardColumnDropZone({
   children,
+  onDropTicket,
   state,
 }: {
   children: ReactNode;
+  onDropTicket: (event: DragEvent<HTMLElement>, state: TicketState) => void;
   state: TicketState;
 }) {
-  const { setNodeRef } = useDroppable({ id: state });
-
   return (
-    <article className="kanban-column" ref={setNodeRef}>
+    <article
+      className="kanban-column"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => onDropTicket(event, state)}
+    >
       <h2>{state}</h2>
       {children}
     </article>
@@ -352,22 +345,13 @@ function BoardColumnDropZone({
 }
 
 function DraggableTicketCard({ ticket }: { ticket: TicketReadModel }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: ticket.id,
-  });
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
-
   return (
     <a
       aria-label={`Open ticket ${ticket.title}`}
       className="ticket-card"
+      draggable
       href={`/tickets/${ticket.id}`}
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
+      onDragStart={(event) => event.dataTransfer.setData("text/plain", ticket.id)}
     >
       <strong>{ticket.title}</strong>
       <span>{ticket.type}</span>
