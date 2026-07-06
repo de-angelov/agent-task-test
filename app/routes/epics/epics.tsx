@@ -3,6 +3,7 @@ import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
+import { ScreenShell } from "~/components/screen-shell";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
 import {
@@ -13,7 +14,6 @@ import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { listTeams, type Team } from "~/services/teams/teams.server";
 
 import { handleEpicAction } from "./epics-action.server";
-import { ScreenShell } from "../placeholders/placeholder-ui";
 
 export type ActionData = {
   message: string;
