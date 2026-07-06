@@ -498,6 +498,7 @@ describe("ticket details route", () => {
         userEmail: "user@example.com",
       },
       {
+        intent: "delete-ticket",
         message: "Confirm deletion before deleting this ticket.",
         status: "error",
       },
@@ -629,7 +630,7 @@ describe("ticket details route", () => {
     expect(html).toContain("No comments yet.");
   });
 
-  it("renders an add-comment form", () => {
+  it("renders an add-comment trigger and dialog with the comment form", () => {
     const html = renderDetails({
       status: "found",
       ticket: {
@@ -652,14 +653,18 @@ describe("ticket details route", () => {
       userEmail: "user@example.com",
     });
 
+    expect(html).toContain("<button");
     expect(html).toContain("Add comment");
+    expect(html).toContain("<dialog");
+    expect(html).toContain('id="add-comment-form"');
+    expect(html).toContain('method="post"');
     expect(html).toContain('name="intent"');
     expect(html).toContain('value="add-comment"');
     expect(html).toContain('name="body"');
     expect(html).toMatch(/<textarea[^>]*name="body"/);
   });
 
-  it("renders validation errors returned by the add-comment action", () => {
+  it("renders validation errors returned by the add-comment action from within the dialog", () => {
     const html = renderDetails(
       {
         status: "found",
@@ -683,13 +688,58 @@ describe("ticket details route", () => {
         userEmail: "user@example.com",
       },
       {
+        intent: "add-comment",
         message: "Comment cannot be empty.",
         status: "error",
       },
     );
 
+    const dialogIndex = html.indexOf("<dialog");
+
+    expect(dialogIndex).toBeGreaterThan(-1);
     expect(html).toContain('role="alert"');
     expect(html).toContain("Comment cannot be empty.");
+    expect(html.indexOf("Comment cannot be empty.")).toBeGreaterThan(
+      dialogIndex,
+    );
+  });
+
+  it("does not surface delete-ticket errors inside the add-comment dialog", () => {
+    const html = renderDetails(
+      {
+        status: "found",
+        ticket: {
+          id: "ticket-1",
+          title: "Create service",
+          body: "Create a focused backend service",
+          type: "feature",
+          state: "backlog",
+          teamId: "team-1",
+          teamName: "Platform",
+          epicId: null,
+          epicTitle: null,
+          createdBy: userId,
+          createdByEmail: "user@example.com",
+          createdAt: "2026-06-30T10:00:00.000Z",
+          modifiedAt: "2026-06-30T10:30:00.000Z",
+        },
+        comments: [],
+        currentUserId: userId,
+        userEmail: "user@example.com",
+      },
+      {
+        intent: "delete-ticket",
+        message: "Confirm deletion before deleting this ticket.",
+        status: "error",
+      },
+    );
+
+    const dialogIndex = html.indexOf("<dialog");
+
+    expect(html).toContain('role="alert"');
+    expect(html.indexOf("Confirm deletion before deleting this ticket.")).toBeLessThan(
+      dialogIndex,
+    );
   });
 
   it.each([
@@ -801,6 +851,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(400);
     expect(result.data).toEqual({
+      intent: "delete-ticket",
       message: "Confirm deletion before deleting this ticket.",
       status: "error",
     });
@@ -849,6 +900,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(400);
     expect(result.data).toEqual({
+      intent: "delete-ticket",
       message: "Ticket not found.",
       status: "error",
     });
@@ -954,6 +1006,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(400);
     expect(result.data).toEqual({
+      intent: "add-comment",
       message: "Comment cannot be empty.",
       status: "error",
     });
@@ -972,6 +1025,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(400);
     expect(result.data).toEqual({
+      intent: "add-comment",
       message: "Ticket not found.",
       status: "error",
     });
@@ -1097,6 +1151,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(400);
     expect(result.data).toEqual({
+      intent: "edit-comment",
       message: "Comment cannot be empty.",
       status: "error",
     });
@@ -1124,6 +1179,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(403);
     expect(result.data).toEqual({
+      intent: "edit-comment",
       message: "You can only edit your own comments.",
       status: "error",
     });
@@ -1148,6 +1204,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(404);
     expect(result.data).toEqual({
+      intent: "edit-comment",
       message: "Comment not found.",
       status: "error",
     });
@@ -1235,6 +1292,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(403);
     expect(result.data).toEqual({
+      intent: "delete-comment",
       message: "You can only delete your own comments.",
       status: "error",
     });
@@ -1259,6 +1317,7 @@ describe("ticket details route", () => {
 
     expect(result.init.status).toBe(404);
     expect(result.data).toEqual({
+      intent: "delete-comment",
       message: "Comment not found.",
       status: "error",
     });
