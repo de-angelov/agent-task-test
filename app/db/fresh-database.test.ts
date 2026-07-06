@@ -72,6 +72,7 @@ describe("fresh database initialization", () => {
           "email_verification_tokens",
           "password_reset_tokens",
           "sessions",
+          "comments",
         ]),
       );
 
@@ -140,6 +141,62 @@ describe("fresh database initialization", () => {
           },
           {
             from: "created_by",
+            onDelete: "RESTRICT",
+            onUpdate: "CASCADE",
+            table: "users",
+            to: "id",
+          },
+        ]),
+      );
+
+      const commentColumns = sqlite
+        .prepare("PRAGMA table_info(comments)")
+        .all() as Array<{ name: string; notnull: 0 | 1 }>;
+
+      expect(
+        commentColumns.map((column) => ({
+          name: column.name,
+          required: column.notnull === 1,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { name: "id", required: true },
+          { name: "ticket_id", required: true },
+          { name: "author_id", required: true },
+          { name: "body", required: true },
+          { name: "created_at", required: true },
+        ]),
+      );
+
+      const commentForeignKeys = sqlite
+        .prepare("PRAGMA foreign_key_list(comments)")
+        .all() as Array<{
+          from: string;
+          on_delete: string;
+          on_update: string;
+          table: string;
+          to: string;
+        }>;
+
+      expect(
+        commentForeignKeys.map((foreignKey) => ({
+          from: foreignKey.from,
+          onDelete: foreignKey.on_delete,
+          onUpdate: foreignKey.on_update,
+          table: foreignKey.table,
+          to: foreignKey.to,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          {
+            from: "ticket_id",
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE",
+            table: "tickets",
+            to: "id",
+          },
+          {
+            from: "author_id",
             onDelete: "RESTRICT",
             onUpdate: "CASCADE",
             table: "users",
