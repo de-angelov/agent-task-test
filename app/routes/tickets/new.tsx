@@ -1,6 +1,7 @@
 import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
+import { ScreenShell } from "~/components/screen-shell";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
@@ -11,7 +12,6 @@ import {
   handleTicketCreateAction,
   type TicketCreateActionData,
 } from "./new-action.server";
-import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderData = {
   epics: Epic[];

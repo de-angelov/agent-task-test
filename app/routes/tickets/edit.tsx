@@ -1,6 +1,7 @@
 import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
+import { ScreenShell } from "~/components/screen-shell";
 import { db } from "~/db/client.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
@@ -11,7 +12,6 @@ import {
   type LoaderData,
   type TicketEditActionData,
 } from "./edit.server";
-import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;

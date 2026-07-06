@@ -4,6 +4,7 @@ import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
+import { ScreenShell } from "~/components/screen-shell";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
@@ -22,7 +23,6 @@ import {
 } from "~/services/tickets/tickets.server";
 import { listTeams, type AppDb, type Team } from "~/services/teams/teams.server";
 
-import { ScreenShell } from "../placeholders/placeholder-ui";
 import {
   handleTicketCreateAction,
   type TicketCreateActionData,

@@ -4,6 +4,7 @@ import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
+import { ScreenShell } from "~/components/screen-shell";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import type { CommentReadModel } from "~/services/comments/comments.server";
 import type { TicketActivityReadModel } from "~/services/ticket-activity/ticket-activity.server";
@@ -21,7 +22,6 @@ import {
   type TicketDeleteCommentActionData,
   type TicketEditCommentActionData,
 } from "./details.server";
-import { ScreenShell } from "../placeholders/placeholder-ui";
 
 type LoaderArgs = {
   request: Request;

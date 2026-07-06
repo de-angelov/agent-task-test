@@ -3,6 +3,7 @@ import { useActionData, useLoaderData } from "react-router";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
+import { ScreenShell } from "~/components/screen-shell";
 import { Table, type TableColumn } from "~/components/table";
 import { db } from "~/db/client.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
@@ -11,7 +12,6 @@ import {
   type TeamManagementRow,
 } from "~/services/teams/teams.server";
 
-import { ScreenShell } from "../placeholders/placeholder-ui";
 import { handleTeamAction } from "./teams-action.server";
 
 type ActionData = {
