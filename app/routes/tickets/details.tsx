@@ -6,9 +6,11 @@ import { requireAuthenticatedUser } from "~/services/session/session.server";
 import type { TicketReadModel } from "~/services/tickets/tickets.server";
 
 import {
+  handleTicketAddCommentAction,
   handleTicketDeleteAction,
   readTicketDetails,
   type LoaderData,
+  type TicketAddCommentActionData,
   type TicketDeleteActionData,
 } from "./details.server";
 import { ScreenShell } from "../placeholders/placeholder-ui";
@@ -33,15 +35,19 @@ export async function loader({ request, params }: LoaderArgs) {
 }
 
 export async function action({ request, params }: LoaderArgs) {
-  await requireAuthenticatedUser(request);
+  const user = await requireAuthenticatedUser(request);
 
   const { db } = await import("~/db/client.server");
 
-  return handleTicketDeleteAction(
-    db,
-    params.ticketId ?? "",
-    await request.formData(),
-  );
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+  const ticketId = params.ticketId ?? "";
+
+  return match(intent)
+    .with("add-comment", () =>
+      handleTicketAddCommentAction(db, ticketId, user.id, formData),
+    )
+    .otherwise(() => handleTicketDeleteAction(db, ticketId, formData));
 }
 
 function getStateLabel(state: TicketReadModel["state"]) {
@@ -86,7 +92,7 @@ export function TicketDetailsView({
   actionData,
   data,
 }: {
-  actionData?: TicketDeleteActionData;
+  actionData?: TicketDeleteActionData | TicketAddCommentActionData;
   data: LoaderData;
 }) {
   return (

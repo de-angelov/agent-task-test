@@ -12,7 +12,10 @@ import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
 
 import { action, loader, TicketDetailsView } from "./details";
-import { handleTicketDeleteAction } from "./details.server";
+import {
+  handleTicketAddCommentAction,
+  handleTicketDeleteAction,
+} from "./details.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
 const userId = "user-1";
@@ -206,6 +209,15 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
 }
 
 function unwrapActionData(result: ReturnType<typeof handleTicketDeleteAction>) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
+  };
+}
+
+function unwrapCommentActionData(
+  result: ReturnType<typeof handleTicketAddCommentAction>,
+) {
   return result as unknown as {
     data: { message: string; status: "error" };
     init: { status: number };
@@ -594,5 +606,131 @@ describe("ticket details route", () => {
     expect(result.status).toBe(302);
     expect(result.headers.get("Location")).toBe("/board");
     expect(database.select().from(schema.tickets).get()).toBeUndefined();
+  });
+
+  it("requires authentication before adding a comment", async () => {
+    await expect(
+      action({
+        request: new Request("http://example.com/tickets/ticket-1", {
+          body: createFormData({ body: "Looks good", intent: "add-comment" }),
+          method: "POST",
+        }),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("adds a comment for a valid submission", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Review ticket",
+        body: "Needs a second pair of eyes",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = handleTicketAddCommentAction(
+      database,
+      ticket.id,
+      userId,
+      createFormData({ body: "Looks good to me" }),
+    ) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database.select().from(schema.comments).get(),
+    ).toMatchObject({ authorId: userId, body: "Looks good to me" });
+  });
+
+  it("returns a validation error when the comment body is empty", () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Review ticket",
+        body: "Needs a second pair of eyes",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = unwrapCommentActionData(
+      handleTicketAddCommentAction(
+        database,
+        ticket.id,
+        userId,
+        createFormData({ body: "   " }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Comment cannot be empty.",
+      status: "error",
+    });
+    expect(database.select().from(schema.comments).get()).toBeUndefined();
+  });
+
+  it("returns a validation error when the commented ticket is missing", () => {
+    const result = unwrapCommentActionData(
+      handleTicketAddCommentAction(
+        database,
+        "missing-ticket",
+        userId,
+        createFormData({ body: "Looks good to me" }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket not found.",
+      status: "error",
+    });
+  });
+
+  it("adds a comment through the authenticated route action and redirects", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Review ticket",
+        body: "Needs a second pair of eyes",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const result = (await action({
+      request: await createAuthedFormRequest(ticket.id, {
+        body: "Looks good to me",
+        intent: "add-comment",
+      }),
+      params: {
+        ticketId: ticket.id,
+      },
+    })) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database.select().from(schema.comments).get(),
+    ).toMatchObject({ authorId: userId, body: "Looks good to me" });
   });
 });
