@@ -258,6 +258,7 @@ describe("ticket details route", () => {
         createdByEmail: "user@example.com",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
   });
 
@@ -345,6 +346,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("Create service");
@@ -366,6 +368,35 @@ describe("ticket details route", () => {
     expect(html).toContain("Delete ticket");
   });
 
+  it("renders the authenticated shell navigation with the signed-in user's email", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      userEmail: "member@example.com",
+    });
+
+    expect(html).toContain("TICKET TRACKER");
+    expect(html).toContain('href="/board"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="/epics"');
+    expect(html).toMatch(/<header[^>]*>.*member@example\.com.*<\/header>/);
+  });
+
   it("renders No epic when the ticket has no epic", () => {
     const html = renderDetails({
       status: "found",
@@ -385,6 +416,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("<dt>Epic</dt><dd>No epic</dd>");
@@ -410,6 +442,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        userEmail: "user@example.com",
       },
       {
         message: "Confirm deletion before deleting this ticket.",
@@ -457,6 +490,7 @@ describe("ticket details route", () => {
           createdAt: "2026-06-30T10:30:00.000Z",
         },
       ],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("Comments");
@@ -488,6 +522,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("No comments yet.");
@@ -512,6 +547,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("Add comment");
@@ -541,6 +577,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        userEmail: "user@example.com",
       },
       {
         message: "Comment cannot be empty.",
@@ -576,6 +613,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain(`<dt>State</dt><dd>${label}</dd>`);
@@ -585,6 +623,7 @@ describe("ticket details route", () => {
     const html = renderDetails({
       status: "not-found",
       ticketId: "missing-ticket",
+      userEmail: "user@example.com",
     });
 
     expect(html).toContain("Ticket");
@@ -604,6 +643,7 @@ describe("ticket details route", () => {
     ).resolves.toEqual({
       status: "not-found",
       ticketId: "missing-ticket",
+      userEmail: "user@example.com",
     });
   });
 

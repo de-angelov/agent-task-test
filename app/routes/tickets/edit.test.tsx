@@ -314,6 +314,20 @@ describe("ticket edit route", () => {
     });
   });
 
+  it("renders the authenticated shell navigation with the signed-in user's email", () => {
+    const html = renderToString(
+      <TicketEditView
+        data={buildFoundEditData({ userEmail: "member@example.com" })}
+      />,
+    );
+
+    expect(html).toContain("TICKET TRACKER");
+    expect(html).toContain('href="/board"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="/epics"');
+    expect(html).toContain("member@example.com");
+  });
+
   it("renders the loaded ticket edit form fields", () => {
     const html = renderToString(<TicketEditView data={buildFoundEditData()} />);
 

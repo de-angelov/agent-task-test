@@ -119,6 +119,18 @@ describe("teams route", () => {
     expect(html).toContain("Delete the team&#x27;s tickets before deleting the team.");
   });
 
+  it("renders the authenticated shell navigation with the signed-in user's email", () => {
+    const html = renderToString(
+      <TeamsView teams={[]} userEmail="member@example.com" />,
+    );
+
+    expect(html).toContain("TICKET TRACKER");
+    expect(html).toContain('href="/board"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="/epics"');
+    expect(html).toContain("member@example.com");
+  });
+
   it("renders dialog actions for opening, cancelling, and submitting team creation", () => {
     const html = renderToString(<TeamsView teams={[]} />);
 

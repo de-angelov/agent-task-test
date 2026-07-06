@@ -19,11 +19,13 @@ export type TicketDetailsFound = {
   status: "found";
   ticket: TicketReadModel;
   comments: CommentReadModel[];
+  userEmail: string;
 };
 
 export type TicketDetailsNotFound = {
   status: "not-found";
   ticketId: string;
+  userEmail: string;
 };
 
 export type LoaderData = TicketDetailsFound | TicketDetailsNotFound;
@@ -41,6 +43,7 @@ export type TicketAddCommentActionData = {
 export function readTicketDetails(
   database: AppDb,
   ticketId: string,
+  userEmail: string,
 ): LoaderData {
   const ticket = getTicketById(database, { id: ticketId });
 
@@ -48,6 +51,7 @@ export function readTicketDetails(
     return {
       status: "not-found",
       ticketId,
+      userEmail,
     };
   }
 
@@ -55,6 +59,7 @@ export function readTicketDetails(
     status: "found",
     ticket: ticket.value,
     comments: listTicketComments(database, { ticketId: ticket.value.id }),
+    userEmail,
   };
 }
 

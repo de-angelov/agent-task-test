@@ -28,11 +28,11 @@ export function meta() {
 }
 
 export async function loader({ request, params }: LoaderArgs) {
-  await requireAuthenticatedUser(request);
+  const user = await requireAuthenticatedUser(request);
 
   const { db } = await import("~/db/client.server");
 
-  return readTicketDetails(db, params.ticketId ?? "");
+  return readTicketDetails(db, params.ticketId ?? "", user.email);
 }
 
 export async function action({ request, params }: LoaderArgs) {
@@ -136,7 +136,7 @@ export function TicketDetailsView({
   data: LoaderData;
 }) {
   return (
-    <ScreenShell title="Ticket details">
+    <ScreenShell title="Ticket details" userEmail={data.userEmail}>
       {actionData ? (
         <p className="placeholder-notice" role="alert">
           {actionData.message}
