@@ -32,6 +32,10 @@ export interface TicketActivity {
   createdAt: string;
 }
 
+export interface TicketActivityReadModel extends TicketActivity {
+  actorEmail: string;
+}
+
 export type RecordTicketActivityError =
   | "actor-not-found"
   | "invalid-action-type"
@@ -97,13 +101,24 @@ export function recordTicketActivity(
   return ok(activity);
 }
 
+const ticketActivityReadColumns = {
+  id: schema.ticketActivity.id,
+  ticketId: schema.ticketActivity.ticketId,
+  actorId: schema.ticketActivity.actorId,
+  actorEmail: schema.users.email,
+  actionType: schema.ticketActivity.actionType,
+  detail: schema.ticketActivity.detail,
+  createdAt: schema.ticketActivity.createdAt,
+};
+
 export function listTicketActivity(
   database: AppDb,
   input: { ticketId: string },
-): TicketActivity[] {
+): TicketActivityReadModel[] {
   return database
-    .select()
+    .select(ticketActivityReadColumns)
     .from(schema.ticketActivity)
+    .innerJoin(schema.users, eq(schema.users.id, schema.ticketActivity.actorId))
     .where(eq(schema.ticketActivity.ticketId, input.ticketId))
     .orderBy(asc(schema.ticketActivity.createdAt))
     .all();

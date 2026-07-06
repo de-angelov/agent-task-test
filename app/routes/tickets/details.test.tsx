@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "~/db/schema";
 import { addTicketComment } from "~/services/comments/comments.server";
 import { createEpic } from "~/services/epics/epics.server";
+import { recordTicketActivity } from "~/services/ticket-activity/ticket-activity.server";
 import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
@@ -317,6 +318,7 @@ describe("ticket details route", () => {
         createdByEmail: "user@example.com",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -387,6 +389,59 @@ describe("ticket details route", () => {
     });
   });
 
+  it("loads ticket activity oldest first with actor display data", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    createSecondUserForTest();
+
+    const first = recordTicketActivity(
+      database,
+      { ticketId: ticket.id, actorId: userId, actionType: "created" },
+      { now: () => new Date("2026-06-30T10:15:00.000Z") },
+    )._unsafeUnwrap();
+
+    const second = recordTicketActivity(
+      database,
+      {
+        ticketId: ticket.id,
+        actorId: "user-2",
+        actionType: "state-changed",
+        detail: "backlog -> todo",
+      },
+      { now: () => new Date("2026-06-30T10:30:00.000Z") },
+    )._unsafeUnwrap();
+
+    const result = await loader({
+      request: await createAuthedRequest(ticket.id),
+      params: {
+        ticketId: ticket.id,
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "found",
+      activity: [
+        {
+          id: first.id,
+          actorId: userId,
+          actorEmail: "user@example.com",
+          actionType: "created",
+          detail: null,
+          createdAt: first.createdAt,
+        },
+        {
+          id: second.id,
+          actorId: "user-2",
+          actorEmail: "reviewer@example.com",
+          actionType: "state-changed",
+          detail: "backlog -> todo",
+          createdAt: second.createdAt,
+        },
+      ],
+    });
+  });
+
   it("renders ticket fields, navigation, and delete confirmation", () => {
     const html = renderDetails({
       status: "found",
@@ -406,6 +461,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -448,6 +504,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "member@example.com",
     });
@@ -478,6 +535,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -505,6 +563,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        activity: [],
         currentUserId: userId,
         userEmail: "user@example.com",
       },
@@ -555,6 +614,7 @@ describe("ticket details route", () => {
           createdAt: "2026-06-30T10:30:00.000Z",
         },
       ],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -605,6 +665,7 @@ describe("ticket details route", () => {
           createdAt: "2026-06-30T10:30:00.000Z",
         },
       ],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -634,11 +695,95 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
 
     expect(html).toContain("No comments yet.");
+  });
+
+  it("renders ticket activity in chronological order with actor, label, detail, and timestamp", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      activity: [
+        {
+          id: "activity-1",
+          ticketId: "ticket-1",
+          actorId: userId,
+          actorEmail: "user@example.com",
+          actionType: "created",
+          detail: null,
+          createdAt: "2026-06-30T10:00:00.000Z",
+        },
+        {
+          id: "activity-2",
+          ticketId: "ticket-1",
+          actorId: "user-2",
+          actorEmail: "reviewer@example.com",
+          actionType: "state-changed",
+          detail: "backlog -> todo",
+          createdAt: "2026-06-30T10:30:00.000Z",
+        },
+      ],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    expect(html).toContain("Activity");
+    expect(html).toContain("Ticket created");
+    expect(html).toContain("State changed");
+    expect(html).toContain("backlog -&gt; todo");
+    expect(html).toContain("user@example.com");
+    expect(html).toContain("reviewer@example.com");
+    expect(html.indexOf("Ticket created")).toBeLessThan(
+      html.indexOf("State changed"),
+    );
+    expect(html).toContain('<time dateTime="2026-06-30T10:00:00.000Z">');
+    expect(html).toContain('<time dateTime="2026-06-30T10:30:00.000Z">');
+  });
+
+  it("renders a message when there is no activity yet", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      activity: [],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    expect(html).toContain("No activity yet.");
   });
 
   it("renders an add-comment trigger and dialog with the comment form", () => {
@@ -660,6 +805,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });
@@ -695,6 +841,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        activity: [],
         currentUserId: userId,
         userEmail: "user@example.com",
       },
@@ -735,6 +882,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        activity: [],
         currentUserId: userId,
         userEmail: "user@example.com",
       },
@@ -777,6 +925,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      activity: [],
       currentUserId: userId,
       userEmail: "user@example.com",
     });

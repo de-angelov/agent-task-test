@@ -197,8 +197,8 @@ describe("listTicketActivity", () => {
     )._unsafeUnwrap();
 
     expect(listTicketActivity(database, { ticketId: ticket.id })).toEqual([
-      first,
-      second,
+      { ...first, actorEmail: "user@example.com" },
+      { ...second, actorEmail: "user@example.com" },
     ]);
   });
 
