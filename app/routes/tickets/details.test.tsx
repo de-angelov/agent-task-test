@@ -466,9 +466,11 @@ describe("ticket details route", () => {
       userEmail: "user@example.com",
     });
 
-    expect(html).toContain("Create service");
+    expect(html).toContain("<h2>Create service</h2>");
     expect(html).toContain("Create a focused backend service");
-    expect(html).toContain("<dt>Type</dt><dd>feature</dd>");
+    expect(html).toContain("Type: feature");
+    expect(html).toContain("State: Backlog");
+    expect(html).toContain("Epic: Launch Plan");
     expect(html).toContain("<dt>Team</dt><dd>Platform</dd>");
     expect(html).toContain("<dt>Epic</dt><dd>Launch Plan</dd>");
     expect(html).toContain("<dt>Created by</dt><dd>user@example.com</dd>");
@@ -483,6 +485,110 @@ describe("ticket details route", () => {
     expect(html).toContain('value="yes"');
     expect(html).toContain("Confirm deletion");
     expect(html).toContain("Delete ticket");
+  });
+
+  it("renders a ticket header with title, type, state, and epic when present", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "in-progress",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: "epic-1",
+        epicTitle: "Launch Plan",
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      activity: [],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    const headerMatch = html.match(
+      /<section aria-label="Ticket header"[^>]*>(.*?)<\/section>/,
+    );
+
+    expect(headerMatch).not.toBeNull();
+    expect(headerMatch![1]).toContain("<h2>Create service</h2>");
+    expect(headerMatch![1]).toContain("Type: feature");
+    expect(headerMatch![1]).toContain("State: In progress");
+    expect(headerMatch![1]).toContain("Epic: Launch Plan");
+  });
+
+  it("omits the epic line from the header when the ticket has no epic", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      activity: [],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    const headerMatch = html.match(
+      /<section aria-label="Ticket header"[^>]*>(.*?)<\/section>/,
+    );
+
+    expect(headerMatch).not.toBeNull();
+    expect(headerMatch![1]).not.toContain("Epic:");
+  });
+
+  it("presents header, fields, edit/delete actions, and comments in wireframe order", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+      activity: [],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    const headerIndex = html.indexOf('aria-label="Ticket header"');
+    const fieldsIndex = html.indexOf("<h2>Details</h2>");
+    const editIndex = html.indexOf('href="/tickets/ticket-1/edit"');
+    const deleteIndex = html.indexOf("<h2>Delete ticket</h2>");
+    const commentsIndex = html.indexOf("<h2>Comments</h2>");
+
+    expect(headerIndex).toBeGreaterThan(-1);
+    expect(headerIndex).toBeLessThan(fieldsIndex);
+    expect(fieldsIndex).toBeLessThan(editIndex);
+    expect(editIndex).toBeLessThan(deleteIndex);
+    expect(deleteIndex).toBeLessThan(commentsIndex);
   });
 
   it("renders the authenticated shell navigation with the signed-in user's email", () => {
@@ -930,7 +1036,7 @@ describe("ticket details route", () => {
       userEmail: "user@example.com",
     });
 
-    expect(html).toContain(`<dt>State</dt><dd>${label}</dd>`);
+    expect(html).toContain(`State: ${label}`);
   });
 
   it("renders a not-found message for missing ticket ids", () => {
