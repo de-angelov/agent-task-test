@@ -1,6 +1,16 @@
-# Minimal React Router App
+# Ticket Tracker
 
-This repository is bootstrapped as a minimal React Router framework-mode application with placeholders for frontend rendering, server-side services, and SQLite persistence through Drizzle.
+A React Router application for tracking teams, epics, and tickets on a
+drag-and-drop board. The app covers account signup and email verification,
+password reset, team and epic management, ticket creation and editing, and a
+board view for moving tickets between columns.
+
+## Setup
+
+1. Install dependencies: `npm install`.
+2. Apply database migrations: `npm run db:migrate`.
+3. Optionally seed a local development user: `npm run db:seed:dev`.
+4. Start the development server: `npm run dev`.
 
 ## Scripts
 
@@ -8,6 +18,7 @@ This repository is bootstrapped as a minimal React Router framework-mode applica
 - `npm run typecheck` generates React Router types and runs TypeScript.
 - `npm test` runs Vitest.
 - `npm run build` builds the production app.
+- `npm run start` runs the production build.
 - `npm run db:migrate` applies Drizzle migrations.
 - `npm run db:seed:dev` creates or refreshes a verified local-only manual QA user, `test@test.com` with password `test`. Run it only for local development databases after migrations.
 
