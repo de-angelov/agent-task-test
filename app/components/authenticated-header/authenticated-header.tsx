@@ -8,6 +8,7 @@ type NavigationLink = {
 type AuthenticatedHeaderProps = {
   userEmail: string;
   navigationLinks?: NavigationLink[];
+  currentPath?: string;
 };
 
 const defaultNavigationLinks: NavigationLink[] = [
@@ -20,16 +21,26 @@ const defaultNavigationLinks: NavigationLink[] = [
 export function AuthenticatedHeader({
   userEmail,
   navigationLinks = defaultNavigationLinks,
+  currentPath,
 }: AuthenticatedHeaderProps) {
   return (
     <header className={styles.header}>
-      <a href="/board">Project tracker</a>
+      <a href="/board">TICKET TRACKER</a>
       <nav className={styles.nav} aria-label="Primary">
-        {navigationLinks.map((link) => (
-          <a href={link.href} key={link.href}>
-            {link.label}
-          </a>
-        ))}
+        {navigationLinks.map((link) => {
+          const isActive = link.href === currentPath;
+
+          return (
+            <a
+              href={link.href}
+              key={link.href}
+              aria-current={isActive ? "page" : undefined}
+              className={isActive ? styles.activeLink : undefined}
+            >
+              {link.label}
+            </a>
+          );
+        })}
       </nav>
       <div className={styles.user}>
         <span>{userEmail}</span>
