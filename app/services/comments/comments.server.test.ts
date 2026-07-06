@@ -9,6 +9,8 @@ import { createTeam, type AppDb } from "../teams/teams.server";
 import { createTicket } from "../tickets/tickets.server";
 import {
   addTicketComment,
+  deleteOwnTicketComment,
+  editOwnTicketComment,
   listTicketComments,
   normalizeCommentBody,
 } from "./comments.server";
@@ -186,6 +188,169 @@ describe("comment service", () => {
       .get();
 
     expect(persistedTicket?.modifiedAt).toBe(ticket.modifiedAt);
+  });
+});
+
+function createSecondUserForTest() {
+  database
+    .insert(schema.users)
+    .values({
+      id: "user-2",
+      email: "other@example.com",
+      passwordHash: "hash",
+      createdAt: now.getTime(),
+    })
+    .run();
+}
+
+describe("editOwnTicketComment", () => {
+  it("rejects edits to a missing comment", () => {
+    expect(
+      editOwnTicketComment(database, {
+        commentId: "missing-comment",
+        callerId: "user-1",
+        body: "Updated",
+      })._unsafeUnwrapErr(),
+    ).toBe("not-found");
+  });
+
+  it("rejects edits from a user who does not own the comment", () => {
+    createSecondUserForTest();
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-1",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    expect(
+      editOwnTicketComment(database, {
+        commentId: comment.id,
+        callerId: "user-2",
+        body: "Hijacked",
+      })._unsafeUnwrapErr(),
+    ).toBe("forbidden");
+
+    const persisted = database
+      .select()
+      .from(schema.comments)
+      .where(eq(schema.comments.id, comment.id))
+      .get();
+
+    expect(persisted?.body).toBe("Original");
+  });
+
+  it("rejects an empty body", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-1",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    expect(
+      editOwnTicketComment(database, {
+        commentId: comment.id,
+        callerId: "user-1",
+        body: "   ",
+      })._unsafeUnwrapErr(),
+    ).toBe("empty-body");
+  });
+
+  it("updates the body while preserving the author and createdAt", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const comment = addTicketComment(
+      database,
+      { ticketId: ticket.id, authorId: "user-1", body: "Original" },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    const updated = editOwnTicketComment(database, {
+      commentId: comment.id,
+      callerId: "user-1",
+      body: "  Updated  ",
+    })._unsafeUnwrap();
+
+    expect(updated).toEqual({
+      ...comment,
+      body: "Updated",
+    });
+
+    const persisted = database
+      .select()
+      .from(schema.comments)
+      .where(eq(schema.comments.id, comment.id))
+      .get();
+
+    expect(persisted).toEqual(updated);
+  });
+});
+
+describe("deleteOwnTicketComment", () => {
+  it("rejects deletes of a missing comment", () => {
+    expect(
+      deleteOwnTicketComment(database, {
+        commentId: "missing-comment",
+        callerId: "user-1",
+      })._unsafeUnwrapErr(),
+    ).toBe("not-found");
+  });
+
+  it("rejects deletes from a user who does not own the comment", () => {
+    createSecondUserForTest();
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-1",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    expect(
+      deleteOwnTicketComment(database, {
+        commentId: comment.id,
+        callerId: "user-2",
+      })._unsafeUnwrapErr(),
+    ).toBe("forbidden");
+
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toBeDefined();
+  });
+
+  it("deletes a comment owned by the caller", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-1",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    deleteOwnTicketComment(database, {
+      commentId: comment.id,
+      callerId: "user-1",
+    })._unsafeUnwrap();
+
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toBeUndefined();
   });
 });
 
