@@ -1,7 +1,10 @@
 import { data, redirect } from "react-router";
+import { match } from "ts-pattern";
 
 import {
+  addTicketComment,
   listTicketComments,
+  type CommentAddError,
   type CommentReadModel,
 } from "~/services/comments/comments.server";
 import type { AppDb } from "~/services/teams/teams.server";
@@ -26,6 +29,11 @@ export type TicketDetailsNotFound = {
 export type LoaderData = TicketDetailsFound | TicketDetailsNotFound;
 
 export type TicketDeleteActionData = {
+  message: string;
+  status: "error";
+};
+
+export type TicketAddCommentActionData = {
   message: string;
   status: "error";
 };
@@ -75,4 +83,34 @@ export function handleTicketDeleteAction(
   }
 
   return redirect("/board");
+}
+
+function mapCommentAddError(error: CommentAddError) {
+  return match(error)
+    .with("empty-body", () => "Comment cannot be empty.")
+    .with("ticket-not-found", () => "Ticket not found.")
+    .with("author-not-found", () => "Unable to add comment.")
+    .exhaustive();
+}
+
+export function handleTicketAddCommentAction(
+  database: AppDb,
+  ticketId: string,
+  authorId: string,
+  formData: FormData,
+) {
+  const result = addTicketComment(database, {
+    authorId,
+    body: String(formData.get("body") ?? ""),
+    ticketId,
+  });
+
+  if (result.isErr()) {
+    return data<TicketAddCommentActionData>(
+      { message: mapCommentAddError(result.error), status: "error" },
+      { status: 400 },
+    );
+  }
+
+  return redirect(`/tickets/${ticketId}`);
 }
