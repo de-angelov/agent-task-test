@@ -30,6 +30,10 @@ export interface CommentReadModel {
 
 export type CommentAddError = "author-not-found" | "empty-body" | "ticket-not-found";
 
+export type CommentEditError = "empty-body" | "forbidden" | "not-found";
+
+export type CommentDeleteError = "forbidden" | "not-found";
+
 export function normalizeCommentBody(body: string): Result<string, "empty-body"> {
   const trimmedBody = body.trim();
 
@@ -82,6 +86,70 @@ export function addTicketComment(
   database.insert(schema.comments).values(comment).run();
 
   return ok(comment);
+}
+
+export function editOwnTicketComment(
+  database: AppDb,
+  input: { commentId: string; callerId: string; body: string },
+): Result<Comment, CommentEditError> {
+  const comment = database
+    .select()
+    .from(schema.comments)
+    .where(eq(schema.comments.id, input.commentId))
+    .get();
+
+  if (!comment) {
+    return err("not-found");
+  }
+
+  if (comment.authorId !== input.callerId) {
+    return err("forbidden");
+  }
+
+  const body = normalizeCommentBody(input.body);
+
+  if (body.isErr()) {
+    return err(body.error);
+  }
+
+  const updatedComment: Comment = {
+    ...comment,
+    body: body.value,
+  };
+
+  database
+    .update(schema.comments)
+    .set({ body: updatedComment.body })
+    .where(eq(schema.comments.id, input.commentId))
+    .run();
+
+  return ok(updatedComment);
+}
+
+export function deleteOwnTicketComment(
+  database: AppDb,
+  input: { commentId: string; callerId: string },
+): Result<void, CommentDeleteError> {
+  const comment = database
+    .select({ id: schema.comments.id, authorId: schema.comments.authorId })
+    .from(schema.comments)
+    .where(eq(schema.comments.id, input.commentId))
+    .get();
+
+  if (!comment) {
+    return err("not-found");
+  }
+
+  if (comment.authorId !== input.callerId) {
+    return err("forbidden");
+  }
+
+  database
+    .delete(schema.comments)
+    .where(eq(schema.comments.id, input.commentId))
+    .run();
+
+  return ok(undefined);
 }
 
 const commentReadColumns = {
