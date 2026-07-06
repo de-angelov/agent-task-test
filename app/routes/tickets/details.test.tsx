@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router";
@@ -15,6 +16,8 @@ import { action, loader, TicketDetailsView } from "./details";
 import {
   handleTicketAddCommentAction,
   handleTicketDeleteAction,
+  handleTicketDeleteCommentAction,
+  handleTicketEditCommentAction,
 } from "./details.server";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
@@ -196,6 +199,21 @@ function createTeamForTest(name = "Platform") {
   return createTeam(database, { name }, { now: () => now })._unsafeUnwrap();
 }
 
+function createTicketForTest(teamId: string, createdBy: string) {
+  return createTicket(
+    database,
+    {
+      teamId,
+      createdBy,
+      title: "Review ticket",
+      body: "Needs a second pair of eyes",
+      type: "feature",
+      state: "backlog",
+    },
+    { now: () => now },
+  )._unsafeUnwrap();
+}
+
 function createEpicForTest(teamId: string, title = "Launch Plan") {
   return createEpic(
     database,
@@ -222,6 +240,36 @@ function unwrapCommentActionData(
     data: { message: string; status: "error" };
     init: { status: number };
   };
+}
+
+function unwrapEditCommentActionData(
+  result: ReturnType<typeof handleTicketEditCommentAction>,
+) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
+  };
+}
+
+function unwrapDeleteCommentActionData(
+  result: ReturnType<typeof handleTicketDeleteCommentAction>,
+) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
+  };
+}
+
+function createSecondUserForTest() {
+  database
+    .insert(schema.users)
+    .values({
+      id: "user-2",
+      email: "reviewer@example.com",
+      passwordHash: "hash",
+      createdAt: now.getTime(),
+    })
+    .run();
 }
 
 describe("ticket details route", () => {
@@ -258,6 +306,7 @@ describe("ticket details route", () => {
         createdByEmail: "user@example.com",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
   });
@@ -346,6 +395,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -387,6 +437,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "member@example.com",
     });
 
@@ -416,6 +467,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -442,6 +494,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        currentUserId: userId,
         userEmail: "user@example.com",
       },
       {
@@ -490,6 +543,7 @@ describe("ticket details route", () => {
           createdAt: "2026-06-30T10:30:00.000Z",
         },
       ],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -501,6 +555,52 @@ describe("ticket details route", () => {
     expect(html).toContain("reviewer@example.com");
     expect(html).toContain('<time dateTime="2026-06-30T10:15:00.000Z">');
     expect(html).toContain('<time dateTime="2026-06-30T10:30:00.000Z">');
+  });
+
+  it("shows edit and delete controls only for the caller's own comment", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [
+        {
+          id: "comment-1",
+          ticketId: "ticket-1",
+          authorId: userId,
+          authorEmail: "user@example.com",
+          body: "Own comment",
+          createdAt: "2026-06-30T10:15:00.000Z",
+        },
+        {
+          id: "comment-2",
+          ticketId: "ticket-1",
+          authorId: "user-2",
+          authorEmail: "reviewer@example.com",
+          body: "Someone else's comment",
+          createdAt: "2026-06-30T10:30:00.000Z",
+        },
+      ],
+      currentUserId: userId,
+      userEmail: "user@example.com",
+    });
+
+    expect(html).toContain("Save comment");
+    expect(html).toContain("Delete comment");
+    expect(html).toContain('value="comment-1"');
+    expect(html).not.toContain('value="comment-2"');
   });
 
   it("renders a message when there are no comments yet", () => {
@@ -522,6 +622,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -547,6 +648,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -577,6 +679,7 @@ describe("ticket details route", () => {
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
         comments: [],
+        currentUserId: userId,
         userEmail: "user@example.com",
       },
       {
@@ -613,6 +716,7 @@ describe("ticket details route", () => {
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
       comments: [],
+      currentUserId: userId,
       userEmail: "user@example.com",
     });
 
@@ -903,5 +1007,291 @@ describe("ticket details route", () => {
     expect(
       database.select().from(schema.comments).get(),
     ).toMatchObject({ authorId: userId, body: "Looks good to me" });
+  });
+
+  it("requires authentication before editing a comment", async () => {
+    await expect(
+      action({
+        request: new Request("http://example.com/tickets/ticket-1", {
+          body: createFormData({
+            body: "Updated",
+            commentId: "comment-1",
+            intent: "edit-comment",
+          }),
+          method: "POST",
+        }),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("requires authentication before deleting a comment", async () => {
+    await expect(
+      action({
+        request: new Request("http://example.com/tickets/ticket-1", {
+          body: createFormData({
+            commentId: "comment-1",
+            intent: "delete-comment",
+          }),
+          method: "POST",
+        }),
+        params: {
+          ticketId: "ticket-1",
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+    });
+  });
+
+  it("edits the caller's own comment for a valid submission", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: userId,
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = handleTicketEditCommentAction(
+      database,
+      ticket.id,
+      userId,
+      createFormData({ body: "Updated", commentId: comment.id }),
+    ) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toMatchObject({ body: "Updated" });
+  });
+
+  it("returns a validation error when the edited comment body is empty", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: userId,
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = unwrapEditCommentActionData(
+      handleTicketEditCommentAction(
+        database,
+        ticket.id,
+        userId,
+        createFormData({ body: "   ", commentId: comment.id }),
+      ),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Comment cannot be empty.",
+      status: "error",
+    });
+  });
+
+  it("rejects editing a comment owned by another user", () => {
+    createSecondUserForTest();
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-2",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = unwrapEditCommentActionData(
+      handleTicketEditCommentAction(
+        database,
+        ticket.id,
+        userId,
+        createFormData({ body: "Hijacked", commentId: comment.id }),
+      ),
+    );
+
+    expect(result.init.status).toBe(403);
+    expect(result.data).toEqual({
+      message: "You can only edit your own comments.",
+      status: "error",
+    });
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toMatchObject({ body: "Original" });
+  });
+
+  it("returns a validation error when the edited comment is missing", () => {
+    const result = unwrapEditCommentActionData(
+      handleTicketEditCommentAction(
+        database,
+        "ticket-1",
+        userId,
+        createFormData({ body: "Updated", commentId: "missing-comment" }),
+      ),
+    );
+
+    expect(result.init.status).toBe(404);
+    expect(result.data).toEqual({
+      message: "Comment not found.",
+      status: "error",
+    });
+  });
+
+  it("edits a comment through the authenticated route action and redirects", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: userId,
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = (await action({
+      request: await createAuthedFormRequest(ticket.id, {
+        body: "Updated",
+        commentId: comment.id,
+        intent: "edit-comment",
+      }),
+      params: {
+        ticketId: ticket.id,
+      },
+    })) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toMatchObject({ body: "Updated" });
+  });
+
+  it("deletes the caller's own comment", () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: userId,
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = handleTicketDeleteCommentAction(
+      database,
+      ticket.id,
+      userId,
+      createFormData({ commentId: comment.id }),
+    ) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toBeUndefined();
+  });
+
+  it("rejects deleting a comment owned by another user", () => {
+    createSecondUserForTest();
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: "user-2",
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = unwrapDeleteCommentActionData(
+      handleTicketDeleteCommentAction(
+        database,
+        ticket.id,
+        userId,
+        createFormData({ commentId: comment.id }),
+      ),
+    );
+
+    expect(result.init.status).toBe(403);
+    expect(result.data).toEqual({
+      message: "You can only delete your own comments.",
+      status: "error",
+    });
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toBeDefined();
+  });
+
+  it("returns a validation error when the deleted comment is missing", () => {
+    const result = unwrapDeleteCommentActionData(
+      handleTicketDeleteCommentAction(
+        database,
+        "ticket-1",
+        userId,
+        createFormData({ commentId: "missing-comment" }),
+      ),
+    );
+
+    expect(result.init.status).toBe(404);
+    expect(result.data).toEqual({
+      message: "Comment not found.",
+      status: "error",
+    });
+  });
+
+  it("deletes a comment through the authenticated route action and redirects", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicketForTest(team.id, userId);
+
+    const comment = addTicketComment(database, {
+      ticketId: ticket.id,
+      authorId: userId,
+      body: "Original",
+    })._unsafeUnwrap();
+
+    const result = (await action({
+      request: await createAuthedFormRequest(ticket.id, {
+        commentId: comment.id,
+        intent: "delete-comment",
+      }),
+      params: {
+        ticketId: ticket.id,
+      },
+    })) as Response;
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket.id}`);
+    expect(
+      database
+        .select()
+        .from(schema.comments)
+        .where(eq(schema.comments.id, comment.id))
+        .get(),
+    ).toBeUndefined();
   });
 });

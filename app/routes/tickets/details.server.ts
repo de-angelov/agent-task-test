@@ -3,8 +3,12 @@ import { match } from "ts-pattern";
 
 import {
   addTicketComment,
+  deleteOwnTicketComment,
+  editOwnTicketComment,
   listTicketComments,
   type CommentAddError,
+  type CommentDeleteError,
+  type CommentEditError,
   type CommentReadModel,
 } from "~/services/comments/comments.server";
 import type { AppDb } from "~/services/teams/teams.server";
@@ -19,6 +23,7 @@ export type TicketDetailsFound = {
   status: "found";
   ticket: TicketReadModel;
   comments: CommentReadModel[];
+  currentUserId: string;
   userEmail: string;
 };
 
@@ -40,9 +45,20 @@ export type TicketAddCommentActionData = {
   status: "error";
 };
 
+export type TicketEditCommentActionData = {
+  message: string;
+  status: "error";
+};
+
+export type TicketDeleteCommentActionData = {
+  message: string;
+  status: "error";
+};
+
 export function readTicketDetails(
   database: AppDb,
   ticketId: string,
+  currentUserId: string,
   userEmail: string,
 ): LoaderData {
   const ticket = getTicketById(database, { id: ticketId });
@@ -59,6 +75,7 @@ export function readTicketDetails(
     status: "found",
     ticket: ticket.value,
     comments: listTicketComments(database, { ticketId: ticket.value.id }),
+    currentUserId,
     userEmail,
   };
 }
@@ -114,6 +131,83 @@ export function handleTicketAddCommentAction(
     return data<TicketAddCommentActionData>(
       { message: mapCommentAddError(result.error), status: "error" },
       { status: 400 },
+    );
+  }
+
+  return redirect(`/tickets/${ticketId}`);
+}
+
+function mapCommentEditError(error: CommentEditError) {
+  return match(error)
+    .with("empty-body", () => ({
+      message: "Comment cannot be empty.",
+      statusCode: 400,
+    }))
+    .with("forbidden", () => ({
+      message: "You can only edit your own comments.",
+      statusCode: 403,
+    }))
+    .with("not-found", () => ({
+      message: "Comment not found.",
+      statusCode: 404,
+    }))
+    .exhaustive();
+}
+
+export function handleTicketEditCommentAction(
+  database: AppDb,
+  ticketId: string,
+  callerId: string,
+  formData: FormData,
+) {
+  const result = editOwnTicketComment(database, {
+    commentId: String(formData.get("commentId") ?? ""),
+    callerId,
+    body: String(formData.get("body") ?? ""),
+  });
+
+  if (result.isErr()) {
+    const { message, statusCode } = mapCommentEditError(result.error);
+
+    return data<TicketEditCommentActionData>(
+      { message, status: "error" },
+      { status: statusCode },
+    );
+  }
+
+  return redirect(`/tickets/${ticketId}`);
+}
+
+function mapCommentDeleteError(error: CommentDeleteError) {
+  return match(error)
+    .with("forbidden", () => ({
+      message: "You can only delete your own comments.",
+      statusCode: 403,
+    }))
+    .with("not-found", () => ({
+      message: "Comment not found.",
+      statusCode: 404,
+    }))
+    .exhaustive();
+}
+
+export function handleTicketDeleteCommentAction(
+  database: AppDb,
+  ticketId: string,
+  callerId: string,
+  formData: FormData,
+) {
+  const result = deleteOwnTicketComment(database, {
+    commentId: String(formData.get("commentId") ?? ""),
+    callerId,
+  });
+
+  if (result.isErr()) {
+    const { message, statusCode } = mapCommentDeleteError(result.error);
+
+    return data<TicketDeleteCommentActionData>(
+      { message, status: "error" },
+      { status: statusCode },
     );
   }
 

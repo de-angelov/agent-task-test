@@ -9,10 +9,14 @@ import type { TicketReadModel } from "~/services/tickets/tickets.server";
 import {
   handleTicketAddCommentAction,
   handleTicketDeleteAction,
+  handleTicketDeleteCommentAction,
+  handleTicketEditCommentAction,
   readTicketDetails,
   type LoaderData,
   type TicketAddCommentActionData,
   type TicketDeleteActionData,
+  type TicketDeleteCommentActionData,
+  type TicketEditCommentActionData,
 } from "./details.server";
 import { ScreenShell } from "../placeholders/placeholder-ui";
 
@@ -32,7 +36,7 @@ export async function loader({ request, params }: LoaderArgs) {
 
   const { db } = await import("~/db/client.server");
 
-  return readTicketDetails(db, params.ticketId ?? "", user.email);
+  return readTicketDetails(db, params.ticketId ?? "", user.id, user.email);
 }
 
 export async function action({ request, params }: LoaderArgs) {
@@ -47,6 +51,12 @@ export async function action({ request, params }: LoaderArgs) {
   return match(intent)
     .with("add-comment", () =>
       handleTicketAddCommentAction(db, ticketId, user.id, formData),
+    )
+    .with("edit-comment", () =>
+      handleTicketEditCommentAction(db, ticketId, user.id, formData),
+    )
+    .with("delete-comment", () =>
+      handleTicketDeleteCommentAction(db, ticketId, user.id, formData),
     )
     .otherwise(() => handleTicketDeleteAction(db, ticketId, formData));
 }
@@ -89,7 +99,41 @@ function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
   );
 }
 
-function TicketComments({ comments }: { comments: CommentReadModel[] }) {
+function EditCommentForm({ comment }: { comment: CommentReadModel }) {
+  return (
+    <form className="form-panel" method="post">
+      <input name="intent" type="hidden" value="edit-comment" />
+      <input name="commentId" type="hidden" value={comment.id} />
+      <label className="form-field">
+        <span>Edit comment</span>
+        <textarea defaultValue={comment.body} name="body" rows={3} />
+      </label>
+      <Button type="submit" variant="secondary">
+        Save comment
+      </Button>
+    </form>
+  );
+}
+
+function DeleteCommentForm({ commentId }: { commentId: string }) {
+  return (
+    <form method="post">
+      <input name="intent" type="hidden" value="delete-comment" />
+      <input name="commentId" type="hidden" value={commentId} />
+      <Button type="submit" variant="destructive">
+        Delete comment
+      </Button>
+    </form>
+  );
+}
+
+function TicketComments({
+  comments,
+  currentUserId,
+}: {
+  comments: CommentReadModel[];
+  currentUserId: string;
+}) {
   return (
     <section className="details-list">
       <h2>Comments</h2>
@@ -104,6 +148,12 @@ function TicketComments({ comments }: { comments: CommentReadModel[] }) {
                 <time dateTime={comment.createdAt}>{comment.createdAt}</time>
               </p>
               <p>{comment.body}</p>
+              {comment.authorId === currentUserId ? (
+                <>
+                  <EditCommentForm comment={comment} />
+                  <DeleteCommentForm commentId={comment.id} />
+                </>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -132,7 +182,11 @@ export function TicketDetailsView({
   actionData,
   data,
 }: {
-  actionData?: TicketDeleteActionData | TicketAddCommentActionData;
+  actionData?:
+    | TicketDeleteActionData
+    | TicketAddCommentActionData
+    | TicketEditCommentActionData
+    | TicketDeleteCommentActionData;
   data: LoaderData;
 }) {
   return (
@@ -158,7 +212,10 @@ export function TicketDetailsView({
               Delete ticket
             </Button>
           </form>
-          <TicketComments comments={data.comments} />
+          <TicketComments
+            comments={data.comments}
+            currentUserId={data.currentUserId}
+          />
           <AddCommentForm />
         </>
       ) : (
