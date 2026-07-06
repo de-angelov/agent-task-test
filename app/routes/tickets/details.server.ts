@@ -1,5 +1,9 @@
 import { data, redirect } from "react-router";
 
+import {
+  listTicketComments,
+  type CommentReadModel,
+} from "~/services/comments/comments.server";
 import type { AppDb } from "~/services/teams/teams.server";
 import {
   deleteTicket,
@@ -11,6 +15,7 @@ import {
 export type TicketDetailsFound = {
   status: "found";
   ticket: TicketReadModel;
+  comments: CommentReadModel[];
 };
 
 export type TicketDetailsNotFound = {
@@ -41,6 +46,7 @@ export function readTicketDetails(
   return {
     status: "found",
     ticket: ticket.value,
+    comments: listTicketComments(database, { ticketId: ticket.value.id }),
   };
 }
 

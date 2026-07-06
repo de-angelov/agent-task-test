@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as schema from "~/db/schema";
+import { addTicketComment } from "~/services/comments/comments.server";
 import { createEpic } from "~/services/epics/epics.server";
 import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
@@ -105,6 +106,16 @@ beforeEach(() => {
       user_id text NOT NULL REFERENCES users(id) ON DELETE cascade,
       expires_at integer NOT NULL,
       created_at integer NOT NULL
+    );
+
+    CREATE TABLE comments (
+      id text PRIMARY KEY NOT NULL,
+      ticket_id text NOT NULL,
+      author_id text NOT NULL,
+      body text NOT NULL,
+      created_at text NOT NULL,
+      FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE ON UPDATE CASCADE,
+      FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
   `);
 
@@ -234,6 +245,72 @@ describe("ticket details route", () => {
         epicTitle: "Launch Plan",
         createdByEmail: "user@example.com",
       },
+      comments: [],
+    });
+  });
+
+  it("loads ticket comments oldest first with author display data", async () => {
+    const team = createTeamForTest();
+    const ticket = createTicket(
+      database,
+      {
+        teamId: team.id,
+        createdBy: userId,
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+      },
+      { now: () => now },
+    )._unsafeUnwrap();
+
+    database
+      .insert(schema.users)
+      .values({
+        id: "user-2",
+        email: "reviewer@example.com",
+        passwordHash: "hash",
+        createdAt: now.getTime(),
+      })
+      .run();
+
+    const first = addTicketComment(
+      database,
+      { ticketId: ticket.id, authorId: userId, body: "First" },
+      { now: () => new Date("2026-06-30T10:15:00.000Z") },
+    )._unsafeUnwrap();
+
+    const second = addTicketComment(
+      database,
+      { ticketId: ticket.id, authorId: "user-2", body: "Second" },
+      { now: () => new Date("2026-06-30T10:30:00.000Z") },
+    )._unsafeUnwrap();
+
+    const result = await loader({
+      request: await createAuthedRequest(ticket.id),
+      params: {
+        ticketId: ticket.id,
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "found",
+      comments: [
+        {
+          id: first.id,
+          authorId: userId,
+          authorEmail: "user@example.com",
+          body: "First",
+          createdAt: first.createdAt,
+        },
+        {
+          id: second.id,
+          authorId: "user-2",
+          authorEmail: "reviewer@example.com",
+          body: "Second",
+          createdAt: second.createdAt,
+        },
+      ],
     });
   });
 
@@ -255,6 +332,7 @@ describe("ticket details route", () => {
         createdAt: "2026-06-30T10:00:00.000Z",
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
+      comments: [],
     });
 
     expect(html).toContain("Create service");
@@ -294,6 +372,7 @@ describe("ticket details route", () => {
         createdAt: "2026-06-30T10:00:00.000Z",
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
+      comments: [],
     });
 
     expect(html).toContain("<dt>Epic</dt><dd>No epic</dd>");
@@ -318,6 +397,7 @@ describe("ticket details route", () => {
           createdAt: "2026-06-30T10:00:00.000Z",
           modifiedAt: "2026-06-30T10:30:00.000Z",
         },
+        comments: [],
       },
       {
         message: "Confirm deletion before deleting this ticket.",
@@ -352,6 +432,7 @@ describe("ticket details route", () => {
         createdAt: "2026-06-30T10:00:00.000Z",
         modifiedAt: "2026-06-30T10:30:00.000Z",
       },
+      comments: [],
     });
 
     expect(html).toContain(`<dt>State</dt><dd>${label}</dd>`);
