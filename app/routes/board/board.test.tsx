@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { eq } from "drizzle-orm";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -137,9 +138,11 @@ function makeTicketReadModel(input: {
   };
 }
 
-function unwrapActionData(result: Awaited<ReturnType<BoardModule["action"]>>) {
+function unwrapActionData<TStatus extends string = "error">(
+  result: Awaited<ReturnType<BoardModule["action"]>>,
+) {
   return result as unknown as {
-    data: { message: string; status: "error" };
+    data: { message: string; status: TStatus };
     init: { status: number };
   };
 }
@@ -710,5 +713,134 @@ describe("board route", () => {
       status: "error",
     });
     expect(database.select().from(schema.tickets).all()).toEqual([]);
+  });
+
+  it("persists a direct move between any two ticket states through the board action", async () => {
+    const team = createTeamForTest("Platform");
+    const ticket = createTicketForTest({
+      teamId: team.id,
+      title: "Backlog ticket",
+      type: "feature",
+      state: "backlog",
+    });
+
+    const result = unwrapActionData<"success">(
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            intent: "update-state",
+            ticketId: ticket.id,
+            state: "done",
+          }),
+        ),
+      }),
+    );
+
+    expect(result.init.status).toBe(200);
+    expect(result.data).toEqual({
+      message: "Ticket state updated.",
+      status: "success",
+    });
+    expect(
+      database.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get(),
+    ).toMatchObject({ state: "done" });
+  });
+
+  it("rejects an invalid ticket state value through the board state-update action", async () => {
+    const team = createTeamForTest("Platform");
+    const ticket = createTicketForTest({
+      teamId: team.id,
+      title: "Backlog ticket",
+      type: "feature",
+      state: "backlog",
+    });
+
+    const result = unwrapActionData(
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            intent: "update-state",
+            ticketId: ticket.id,
+            state: "archived",
+          }),
+        ),
+      }),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket state is invalid.",
+      status: "error",
+    });
+    expect(
+      database.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get(),
+    ).toMatchObject({ state: "backlog" });
+  });
+
+  it("returns a not-found response when updating the state of a missing ticket", async () => {
+    const result = unwrapActionData(
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            intent: "update-state",
+            ticketId: "missing-ticket",
+            state: "done",
+          }),
+        ),
+      }),
+    );
+
+    expect(result.init.status).toBe(404);
+    expect(result.data).toEqual({
+      message: "Ticket not found.",
+      status: "error",
+    });
+  });
+
+  it("returns a conflict response when the ticket changed since it was last loaded", async () => {
+    const team = createTeamForTest("Platform");
+    const ticket = createTicketForTest({
+      teamId: team.id,
+      title: "Backlog ticket",
+      type: "feature",
+      state: "backlog",
+    });
+
+    const result = unwrapActionData(
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            intent: "update-state",
+            ticketId: ticket.id,
+            state: "done",
+            expectedModifiedAt: "2020-01-01T00:00:00.000Z",
+          }),
+        ),
+      }),
+    );
+
+    expect(result.init.status).toBe(409);
+    expect(result.data).toEqual({
+      message: "Ticket was updated elsewhere. Reload and try again.",
+      status: "error",
+    });
+    expect(
+      database.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).get(),
+    ).toMatchObject({ state: "backlog" });
+  });
+
+  it("redirects unauthenticated state-update requests to login", async () => {
+    const request = new Request("http://example.com/board", {
+      body: createFormData({
+        intent: "update-state",
+        ticketId: "ticket-1",
+        state: "done",
+      }),
+      method: "POST",
+    });
+
+    await expect(board.action({ request })).rejects.toMatchObject({
+      status: 302,
+    });
   });
 });
