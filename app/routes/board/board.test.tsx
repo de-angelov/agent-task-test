@@ -96,6 +96,7 @@ function makeTicketReadModel(input: {
   id: string;
   title: string;
   state: TicketState;
+  epicTitle?: string | null;
   modifiedAt?: string;
   type?: TicketType;
 }): TicketReadModel {
@@ -107,8 +108,8 @@ function makeTicketReadModel(input: {
     state: input.state,
     teamId: "team-1",
     teamName: "Platform",
-    epicId: null,
-    epicTitle: null,
+    epicId: input.epicTitle ? "epic-1" : null,
+    epicTitle: input.epicTitle ?? null,
     createdBy: userId,
     createdByEmail: userEmail,
     createdAt: "2026-06-30T09:00:00.000Z",
@@ -259,6 +260,80 @@ describe("board route", () => {
       { state: "in-progress", tickets: [] },
       { state: "done", tickets: [doneTicket] },
     ]);
+  });
+
+  it("renders selected-team tickets as cards in their workflow columns", () => {
+    const backlogTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Backlog ticket",
+      state: "backlog",
+      type: "bug",
+      epicTitle: "Platform Launch",
+    });
+    const doneTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Done ticket",
+      state: "done",
+      type: "task",
+    });
+
+    const html = renderToString(
+      <board.BoardView tickets={[doneTicket, backlogTicket]} />,
+    );
+
+    expect(html).toContain('<a aria-label="Open ticket Backlog ticket"');
+    expect(html).toContain('<strong>Backlog ticket</strong>');
+    expect(html).toContain("<span>bug</span>");
+    expect(html).toContain("<span>Platform Launch</span>");
+    expect(html.indexOf("<h2>backlog</h2>")).toBeLessThan(
+      html.indexOf("<strong>Backlog ticket</strong>"),
+    );
+    expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
+      html.indexOf("<strong>Done ticket</strong>"),
+    );
+  });
+
+  it("renders a missing epic fallback on ticket cards", () => {
+    const ticket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Unplanned ticket",
+      state: "todo",
+    });
+
+    const html = renderToString(<board.BoardView tickets={[ticket]} />);
+
+    expect(html).toContain("<span>No epic</span>");
+  });
+
+  it("renders a create-ticket link for the selected team", () => {
+    const html = renderToString(<board.BoardView selectedTeamId="team-1" />);
+
+    expect(html).toContain(
+      '<a class="button-link" href="/tickets/new?teamId=team-1">Create ticket</a>',
+    );
+  });
+
+  it("renders an open-ticket affordance for each card", () => {
+    const firstTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "First ticket",
+      state: "todo",
+    });
+    const secondTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Second ticket",
+      state: "todo",
+    });
+
+    const html = renderToString(
+      <board.BoardView tickets={[firstTicket, secondTicket]} />,
+    );
+
+    expect(html).toContain('href="/tickets/ticket-1"');
+    expect(html).toContain('aria-label="Open ticket First ticket"');
+    expect(html).toContain('href="/tickets/ticket-2"');
+    expect(html).toContain('aria-label="Open ticket Second ticket"');
+    expect(html.match(/<span>Open ticket<\/span>/g)).toHaveLength(2);
   });
 
   it("preserves loader-provided ticket ordering within each column", () => {
