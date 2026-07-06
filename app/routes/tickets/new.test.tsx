@@ -106,6 +106,18 @@ function unwrapActionData(result: ReturnType<typeof handleTicketCreateAction>) {
 }
 
 describe("ticket create route", () => {
+  it("renders the authenticated shell navigation with the signed-in user's email", () => {
+    const html = renderToString(
+      <TicketCreateView userEmail="member@example.com" />,
+    );
+
+    expect(html).toContain("TICKET TRACKER");
+    expect(html).toContain('href="/board"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="/epics"');
+    expect(html).toContain("member@example.com");
+  });
+
   it("renders the create form fields with team-scoped epic options", () => {
     const html = renderToString(
       <TicketCreateView

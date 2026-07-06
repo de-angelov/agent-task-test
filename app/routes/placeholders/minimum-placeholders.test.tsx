@@ -56,7 +56,11 @@ describe("minimum placeholder routes", () => {
     const create = renderToString(<TicketCreateView />);
     const details = renderToString(
       <TicketDetailsView
-        data={{ status: "not-found", ticketId: "TICKET-1" }}
+        data={{
+          status: "not-found",
+          ticketId: "TICKET-1",
+          userEmail: "user@example.com",
+        }}
       />,
     );
     const edit = renderToString(

@@ -15,6 +15,23 @@ import { SignupView } from "./signup";
 import { VerifyEmailView } from "./verify-email";
 
 describe("auth screens", () => {
+  it("renders public auth screens without the authenticated shell navigation", () => {
+    const screens = [
+      renderToString(<LoginView />),
+      renderToString(<SignupView />),
+      renderToString(<ResendVerificationView />),
+      renderToString(<ForgotPasswordView />),
+      renderToString(<ResetPasswordView status="ready" token="reset-token" />),
+      renderToString(<VerifyEmailView status="invalid-token" />),
+    ];
+
+    screens.forEach((html) => {
+      expect(html).not.toContain("TICKET TRACKER");
+      expect(html).not.toContain('aria-label="Primary"');
+      expect(html).not.toContain("Log out");
+    });
+  });
+
   it("renders login primary action, signup link, and resend access", () => {
     const html = renderToString(<LoginView />);
 

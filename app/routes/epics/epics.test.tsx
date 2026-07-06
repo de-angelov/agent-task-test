@@ -117,6 +117,18 @@ function createEpicForTest(teamId: string) {
 }
 
 describe("epics route", () => {
+  it("renders the authenticated shell navigation with the signed-in user's email", () => {
+    const html = renderToString(
+      <EpicsView epics={[]} teams={[]} userEmail="member@example.com" />,
+    );
+
+    expect(html).toContain("TICKET TRACKER");
+    expect(html).toContain('href="/board"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="/epics"');
+    expect(html).toContain("member@example.com");
+  });
+
   it("renders epic management controls, rows, and validation messages", () => {
     const html = renderToString(
       <EpicsView
