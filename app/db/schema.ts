@@ -67,6 +67,19 @@ export const comments = sqliteTable("comments", {
   createdAt: text("created_at").notNull(),
 });
 
+export const ticketActivity = sqliteTable("ticket_activity", {
+  id: text("id").primaryKey(),
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => tickets.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  actorId: text("actor_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict", onUpdate: "cascade" }),
+  actionType: text("action_type").notNull(),
+  detail: text("detail"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const emailVerificationTokens = sqliteTable("email_verification_tokens", {
   id: text("id").primaryKey(),
   userId: text("user_id")

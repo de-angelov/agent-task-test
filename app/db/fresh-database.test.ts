@@ -17,6 +17,7 @@ const applicationTables = [
   "password_reset_tokens",
   "sessions",
   "comments",
+  "ticket_activity",
 ] as const;
 
 let tempDirectory: string | undefined;
@@ -73,6 +74,7 @@ describe("fresh database initialization", () => {
           "password_reset_tokens",
           "sessions",
           "comments",
+          "ticket_activity",
         ]),
       );
 
@@ -204,6 +206,152 @@ describe("fresh database initialization", () => {
           },
         ]),
       );
+
+      const ticketActivityColumns = sqlite
+        .prepare("PRAGMA table_info(ticket_activity)")
+        .all() as Array<{ name: string; notnull: 0 | 1 }>;
+
+      expect(
+        ticketActivityColumns.map((column) => ({
+          name: column.name,
+          required: column.notnull === 1,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          { name: "id", required: true },
+          { name: "ticket_id", required: true },
+          { name: "actor_id", required: true },
+          { name: "action_type", required: true },
+          { name: "detail", required: false },
+          { name: "created_at", required: true },
+        ]),
+      );
+
+      const ticketActivityForeignKeys = sqlite
+        .prepare("PRAGMA foreign_key_list(ticket_activity)")
+        .all() as Array<{
+          from: string;
+          on_delete: string;
+          on_update: string;
+          table: string;
+          to: string;
+        }>;
+
+      expect(
+        ticketActivityForeignKeys.map((foreignKey) => ({
+          from: foreignKey.from,
+          onDelete: foreignKey.on_delete,
+          onUpdate: foreignKey.on_update,
+          table: foreignKey.table,
+          to: foreignKey.to,
+        })),
+      ).toEqual(
+        expect.arrayContaining([
+          {
+            from: "ticket_id",
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE",
+            table: "tickets",
+            to: "id",
+          },
+          {
+            from: "actor_id",
+            onDelete: "RESTRICT",
+            onUpdate: "CASCADE",
+            table: "users",
+            to: "id",
+          },
+        ]),
+      );
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  it("inserts ticket activity rows and enforces required columns and foreign keys", async () => {
+    tempDirectory = await mkdtemp(join(tmpdir(), "repo-agent-db-"));
+    const databasePath = join(tempDirectory, "ticket-activity.db");
+    const sqlite = new Database(databasePath);
+    sqlite.pragma("foreign_keys = ON");
+
+    try {
+      migrate(drizzle(sqlite), { migrationsFolder: "drizzle" });
+
+      sqlite
+        .prepare(
+          "INSERT INTO teams (id, name, normalized_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        )
+        .run("team-1", "Team One", "team one", "2026-07-06T00:00:00.000Z", "2026-07-06T00:00:00.000Z");
+
+      sqlite
+        .prepare(
+          "INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
+        )
+        .run("user-1", "user@example.com", "hash", 1751760000000);
+
+      sqlite
+        .prepare(
+          "INSERT INTO tickets (id, title, body, type, state, team_id, created_by, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .run(
+          "ticket-1",
+          "Ticket One",
+          "Body",
+          "task",
+          "backlog",
+          "team-1",
+          "user-1",
+          "2026-07-06T00:00:00.000Z",
+          "2026-07-06T00:00:00.000Z",
+        );
+
+      sqlite
+        .prepare(
+          "INSERT INTO ticket_activity (id, ticket_id, actor_id, action_type, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(
+          "activity-1",
+          "ticket-1",
+          "user-1",
+          "state-changed",
+          null,
+          "2026-07-06T00:00:00.000Z",
+        );
+
+      const insertedRow = sqlite
+        .prepare("SELECT * FROM ticket_activity WHERE id = ?")
+        .get("activity-1");
+
+      expect(insertedRow).toMatchObject({
+        id: "activity-1",
+        ticket_id: "ticket-1",
+        actor_id: "user-1",
+        action_type: "state-changed",
+        detail: null,
+        created_at: "2026-07-06T00:00:00.000Z",
+      });
+
+      expect(() =>
+        sqlite
+          .prepare(
+            "INSERT INTO ticket_activity (id, ticket_id, actor_id, created_at) VALUES (?, ?, ?, ?)",
+          )
+          .run("activity-2", "ticket-1", "user-1", "2026-07-06T00:00:00.000Z"),
+      ).toThrow(/NOT NULL constraint failed: ticket_activity.action_type/);
+
+      expect(() =>
+        sqlite
+          .prepare(
+            "INSERT INTO ticket_activity (id, ticket_id, actor_id, action_type, created_at) VALUES (?, ?, ?, ?, ?)",
+          )
+          .run(
+            "activity-3",
+            "missing-ticket",
+            "user-1",
+            "state-changed",
+            "2026-07-06T00:00:00.000Z",
+          ),
+      ).toThrow(/FOREIGN KEY constraint failed/);
     } finally {
       sqlite.close();
     }
