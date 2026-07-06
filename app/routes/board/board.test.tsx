@@ -35,6 +35,26 @@ function createAuthenticatedRequest(url = "http://example.com/board") {
   });
 }
 
+function createAuthenticatedFormRequest(formData: FormData) {
+  return new Request("http://example.com/board", {
+    body: formData,
+    headers: {
+      cookie: sessionCookieHeader,
+    },
+    method: "POST",
+  });
+}
+
+function createFormData(entries: Record<string, string>) {
+  const formData = new FormData();
+
+  Object.entries(entries).forEach(([key, value]) => {
+    formData.set(key, value);
+  });
+
+  return formData;
+}
+
 function seedAuthentication() {
   const timestamp = now.getTime();
 
@@ -114,6 +134,13 @@ function makeTicketReadModel(input: {
     createdByEmail: userEmail,
     createdAt: "2026-06-30T09:00:00.000Z",
     modifiedAt: input.modifiedAt ?? "2026-06-30T10:00:00.000Z",
+  };
+}
+
+function unwrapActionData(result: Awaited<ReturnType<BoardModule["action"]>>) {
+  return result as unknown as {
+    data: { message: string; status: "error" };
+    init: { status: number };
   };
 }
 
@@ -305,12 +332,87 @@ describe("board route", () => {
     expect(html).toContain("<span>No epic</span>");
   });
 
-  it("renders a create-ticket link for the selected team", () => {
+  it("renders the create-ticket dialog entry instead of a primary link", () => {
     const html = renderToString(<board.BoardView selectedTeamId="team-1" />);
 
-    expect(html).toContain(
-      '<a class="button-link" href="/tickets/new?teamId=team-1">Create ticket</a>',
+    expect(html).toContain("<button");
+    expect(html).toContain("Create ticket");
+    expect(html).toContain("<dialog");
+    expect(html).toContain('id="board-create-ticket-form"');
+    expect(html).toContain('method="post"');
+    expect(html).not.toContain('href="/tickets/new?teamId=team-1"');
+  });
+
+  it("renders the create fields in the board dialog with same-team epic options", () => {
+    const html = renderToString(
+      <board.BoardView
+        epics={[
+          {
+            id: "epic-1",
+            teamId: "team-1",
+            title: "Platform Launch",
+            description: null,
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+          },
+        ]}
+        selectedTeamId="team-1"
+        teams={[
+          {
+            id: "team-1",
+            name: "Platform",
+            normalizedName: "platform",
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+          },
+          {
+            id: "team-2",
+            name: "Product",
+            normalizedName: "product",
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+          },
+        ]}
+      />,
     );
+
+    expect(html).toContain('name="teamId"');
+    expect(html).toContain('name="epicId"');
+    expect(html).toContain('name="type"');
+    expect(html).toContain('name="state"');
+    expect(html).toContain('name="title"');
+    expect(html).toContain('name="body"');
+    expect(html).toContain("Platform");
+    expect(html).toContain("Product");
+    expect(html).toContain("Platform Launch");
+    expect(html).not.toContain("Product Discovery");
+  });
+
+  it("preserves board content behind the create dialog", () => {
+    const ticket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Visible board ticket",
+      state: "todo",
+    });
+    const html = renderToString(<board.BoardView tickets={[ticket]} />);
+
+    expect(html).toContain("<dialog");
+    expect(html).toContain("<strong>Visible board ticket</strong>");
+    expect(html).toContain('aria-label="Ticket workflow"');
+  });
+
+  it("renders create validation errors in the board dialog", () => {
+    const html = renderToString(
+      <board.BoardView
+        actionData={{
+          message: "Ticket title is required.",
+          status: "error",
+        }}
+      />,
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Ticket title is required.");
   });
 
   it("renders an open-ticket affordance for each card", () => {
@@ -367,6 +469,9 @@ describe("board route", () => {
     const request = new Request("http://example.com/board");
 
     await expect(board.loader({ request })).rejects.toMatchObject({
+      status: 302,
+    });
+    await expect(board.action({ request })).rejects.toMatchObject({
       status: 302,
     });
   });
@@ -550,5 +655,60 @@ describe("board route", () => {
         state: "backlog",
       },
     ]);
+  });
+
+  it("creates a ticket through the board action", async () => {
+    const team = createTeamForTest("Platform");
+    const epic = createEpicForTest(team.id, "Platform Launch");
+    const result = (await board.action({
+      request: createAuthenticatedFormRequest(
+        createFormData({
+          teamId: team.id,
+          epicId: epic.id,
+          title: "  Board dialog ticket  ",
+          body: "  Create from the board dialog  ",
+          type: "feature",
+          state: "backlog",
+        }),
+      ),
+    })) as Response;
+    const ticket = database.select().from(schema.tickets).get();
+
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe(`/tickets/${ticket?.id}`);
+    expect(ticket).toMatchObject({
+      teamId: team.id,
+      epicId: epic.id,
+      createdBy: userId,
+      title: "Board dialog ticket",
+      body: "Create from the board dialog",
+      type: "feature",
+      state: "backlog",
+    });
+  });
+
+  it("returns create validation errors through the board action", async () => {
+    const team = createTeamForTest("Platform");
+    const result = unwrapActionData(
+      await board.action({
+        request: createAuthenticatedFormRequest(
+          createFormData({
+            teamId: team.id,
+            epicId: "",
+            title: "   ",
+            body: "Create from the board dialog",
+            type: "feature",
+            state: "backlog",
+          }),
+        ),
+      }),
+    );
+
+    expect(result.init.status).toBe(400);
+    expect(result.data).toEqual({
+      message: "Ticket title is required.",
+      status: "error",
+    });
+    expect(database.select().from(schema.tickets).all()).toEqual([]);
   });
 });

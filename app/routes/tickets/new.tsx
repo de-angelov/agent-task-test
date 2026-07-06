@@ -5,8 +5,8 @@ import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import { listTeams, type Team } from "~/services/teams/teams.server";
-import { ticketStates, ticketTypes } from "~/services/tickets/ticket-workflow";
 
+import { TicketCreateFields } from "./create-fields";
 import {
   handleTicketCreateAction,
   type TicketCreateActionData,
@@ -82,55 +82,11 @@ export function TicketCreateView({
       </form>
       <form className="form-panel" method="post">
         <h2>Ticket details</h2>
-        <label className="form-field">
-          <span>Team</span>
-          <select defaultValue={selectedTeamId} name="teamId">
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Epic</span>
-          <select name="epicId">
-            <option value="">No epic</option>
-            {epics.map((epic) => (
-              <option key={epic.id} value={epic.id}>
-                {epic.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Type</span>
-          <select defaultValue="feature" name="type">
-            {ticketTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>State</span>
-          <select defaultValue="backlog" name="state">
-            {ticketStates.map((state) => (
-              <option key={state} value={state}>
-                {state}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Title</span>
-          <input name="title" />
-        </label>
-        <label className="form-field">
-          <span>Body</span>
-          <textarea name="body" rows={6} />
-        </label>
+        <TicketCreateFields
+          epics={epics}
+          selectedTeamId={selectedTeamId}
+          teams={teams}
+        />
         <Button type="submit">Create ticket</Button>
       </form>
     </ScreenShell>
