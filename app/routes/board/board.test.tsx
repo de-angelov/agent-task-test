@@ -348,7 +348,7 @@ describe("board route", () => {
   });
 
   describe("board drag interaction", () => {
-    it("marks ticket cards as keyboard-operable dnd-kit draggables", () => {
+    it("marks ticket cards as native HTML5 draggable elements", () => {
       const ticket = makeTicketReadModel({
         id: "ticket-1",
         title: "Backlog ticket",
@@ -357,9 +357,7 @@ describe("board route", () => {
 
       const html = renderToString(<board.BoardView tickets={[ticket]} />);
 
-      expect(html).toContain('role="button"');
-      expect(html).toContain('tabindex="0"');
-      expect(html).toContain('aria-roledescription="draggable"');
+      expect(html).toContain('draggable="true"');
     });
 
     describe("moveTicketState", () => {
@@ -409,27 +407,21 @@ describe("board route", () => {
       });
     });
 
-    // This repo has no jsdom/testing-library, so real pointer/keyboard DOM events
-    // can't be dispatched here. @dnd-kit's KeyboardSensor drives a card move by
-    // calling the same onDragEnd handler (backed by moveTicketState) that the
-    // pointer sensor does, so this exercises that state transition directly and
-    // renders the result, matching this file's existing SSR-only test pattern.
-    it("renders a card under its target column after a keyboard-driven cross-column move completes", () => {
+    // This repo has no jsdom, so a real HTML5 dragstart/dragover/drop sequence
+    // can't be dispatched here. The column's onDrop handler drives a card move
+    // by calling the same moveTicketState update this exercises directly, so
+    // this renders the result, matching this file's existing SSR-only test
+    // pattern.
+    it("renders a card under its target column after a cross-column drop completes", () => {
       const ticket = makeTicketReadModel({
         id: "ticket-1",
         title: "Backlog ticket",
         state: "backlog",
       });
 
-      const ticketsAfterKeyboardMove = board.moveTicketState(
-        [ticket],
-        ticket.id,
-        "done",
-      );
+      const ticketsAfterDrop = board.moveTicketState([ticket], ticket.id, "done");
 
-      const html = renderToString(
-        <board.BoardView tickets={ticketsAfterKeyboardMove} />,
-      );
+      const html = renderToString(<board.BoardView tickets={ticketsAfterDrop} />);
 
       expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
         html.indexOf("<strong>Backlog ticket</strong>"),
