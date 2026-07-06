@@ -29,6 +29,12 @@ export function getBoardColumns(tickets: TicketReadModel[]): BoardColumn[] {
   }));
 }
 
+function getCreateTicketHref(selectedTeamId: string) {
+  return selectedTeamId === ""
+    ? "/tickets/new"
+    : `/tickets/new?teamId=${encodeURIComponent(selectedTeamId)}`;
+}
+
 export function meta() {
   return [{ title: "Kanban Board" }];
 }
@@ -74,8 +80,8 @@ export function BoardView({
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
       <PlaceholderNotice>
-        Team selection, filtering, ticket navigation, and drag-and-drop
-        persistence will connect to backend services later.
+        Team selection, filtering, and drag-and-drop persistence will connect to
+        backend services later.
       </PlaceholderNotice>
       <section className="toolbar" aria-label="Board filters">
         <label className="form-field">
@@ -113,7 +119,7 @@ export function BoardView({
           <span>Search</span>
           <input name="search" type="search" />
         </label>
-        <a className="button-link" href="/tickets/new">
+        <a className="button-link" href={getCreateTicketHref(selectedTeamId)}>
           Create ticket
         </a>
       </section>
@@ -122,10 +128,16 @@ export function BoardView({
           <article className="kanban-column" key={column.state}>
             <h2>{column.state}</h2>
             {column.tickets.map((ticket) => (
-              <a className="ticket-card" href={`/tickets/${ticket.id}`} key={ticket.id}>
+              <a
+                aria-label={`Open ticket ${ticket.title}`}
+                className="ticket-card"
+                href={`/tickets/${ticket.id}`}
+                key={ticket.id}
+              >
                 <strong>{ticket.title}</strong>
                 <span>{ticket.type}</span>
                 <span>{ticket.epicTitle ?? "No epic"}</span>
+                <span>Open ticket</span>
               </a>
             ))}
           </article>
