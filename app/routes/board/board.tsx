@@ -325,6 +325,14 @@ export function BoardView({
           {dragError}
         </p>
       ) : null}
+      <section aria-label="Board actions" className="toolbar">
+        <CreateTicketDialogEntry
+          actionData={actionData}
+          epics={epics}
+          selectedTeamId={selectedTeamId}
+          teams={teams}
+        />
+      </section>
       <section className="toolbar" aria-label="Board filters">
         <form className="form-panel" method="get">
           <label className="form-field">
@@ -367,21 +375,17 @@ export function BoardView({
           <Button type="submit" variant="secondary">
             Apply filters
           </Button>
-          <a href={clearFiltersHref}>Clear filters</a>
         </form>
-        <CreateTicketDialogEntry
-          actionData={actionData}
-          epics={epics}
-          selectedTeamId={selectedTeamId}
-          teams={teams}
-        />
+        <a href={clearFiltersHref}>Clear filters</a>
       </section>
+      <p>{`Total tickets: ${localTickets.length}`}</p>
       <section className="kanban-board" aria-label="Ticket workflow">
         {columns.map((column) => (
           <BoardColumnDropZone
             key={column.state}
             onDropTicket={handleTicketDrop}
             state={column.state}
+            ticketCount={column.tickets.length}
           >
             {column.tickets.map((ticket) => (
               <DraggableTicketCard key={ticket.id} ticket={ticket} />
@@ -397,10 +401,12 @@ function BoardColumnDropZone({
   children,
   onDropTicket,
   state,
+  ticketCount,
 }: {
   children: ReactNode;
   onDropTicket: (event: DragEvent<HTMLElement>, state: TicketState) => void;
   state: TicketState;
+  ticketCount: number;
 }) {
   return (
     <article
@@ -408,7 +414,7 @@ function BoardColumnDropZone({
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => onDropTicket(event, state)}
     >
-      <h2>{state}</h2>
+      <h2>{`${state} (${ticketCount})`}</h2>
       {children}
     </article>
   );
@@ -426,6 +432,7 @@ function DraggableTicketCard({ ticket }: { ticket: TicketReadModel }) {
       <strong>{ticket.title}</strong>
       <span>{ticket.type}</span>
       <span>{ticket.epicTitle ?? "No epic"}</span>
+      <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
       <span>Open ticket</span>
     </a>
   );
