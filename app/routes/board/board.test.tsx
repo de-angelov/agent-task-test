@@ -558,6 +558,25 @@ describe("board route", () => {
     expect(todoColumn?.tickets).toEqual([newerTodoTicket, olderTodoTicket]);
   });
 
+  it("groups and renders a large ticket set without error", () => {
+    const states: TicketState[] = ["backlog", "todo", "in-progress", "done"];
+    const tickets = Array.from({ length: 2000 }, (_, index) =>
+      makeTicketReadModel({
+        id: `ticket-${index}`,
+        title: `Ticket ${index}`,
+        state: states[index % states.length],
+      }),
+    );
+
+    const columns = board.getBoardColumns(tickets);
+
+    expect(columns.every((column) => column.tickets.length === 500)).toBe(true);
+
+    const html = renderToString(<board.BoardView tickets={tickets} />);
+
+    expect(html.match(/class="ticket-card"/g)).toHaveLength(2000);
+  });
+
   it("redirects unauthenticated requests to login", async () => {
     const request = new Request("http://example.com/board");
 
