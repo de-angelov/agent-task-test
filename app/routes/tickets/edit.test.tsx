@@ -9,7 +9,7 @@ import { createTicket } from "~/services/tickets/tickets.server";
 import { createTeam, type AppDb } from "~/services/teams/teams.server";
 import { createSessionCookie } from "~/services/session/session.server";
 
-import { handleTicketEditAction } from "./edit.server";
+import { handleTicketEditAction, type TicketEditFound } from "./edit.server";
 import { action, loader, TicketEditView } from "./edit";
 
 const now = new Date("2026-06-30T10:00:00.000Z");
@@ -189,6 +189,50 @@ function createEpicForTest(teamId: string, title = "Launch Plan") {
   )._unsafeUnwrap();
 }
 
+function buildFoundEditData(
+  overrides: Partial<TicketEditFound> = {},
+): TicketEditFound {
+  return {
+    status: "found",
+    userEmail: "user@example.com",
+    ticket: {
+      id: "ticket-1",
+      title: "Create service",
+      body: "Create a focused backend service",
+      type: "feature",
+      state: "backlog",
+      teamId: "team-1",
+      teamName: "Platform",
+      epicId: "epic-1",
+      epicTitle: "Launch Plan",
+      createdBy: userId,
+      createdByEmail: "user@example.com",
+      createdAt: "2026-06-30T10:00:00.000Z",
+      modifiedAt: "2026-06-30T10:30:00.000Z",
+    },
+    teams: [
+      {
+        id: "team-1",
+        name: "Platform",
+        normalizedName: "platform",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        updatedAt: "2026-06-30T10:00:00.000Z",
+      },
+    ],
+    epics: [
+      {
+        id: "epic-1",
+        teamId: "team-1",
+        title: "Launch Plan",
+        description: "Coordinate the MVP launch",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        updatedAt: "2026-06-30T10:00:00.000Z",
+      },
+    ],
+    ...overrides,
+  };
+}
+
 describe("ticket edit route", () => {
   it("loads the ticket, team list, and team-scoped epics for an authenticated request", async () => {
     const platform = createTeamForTest("Platform");
@@ -271,48 +315,7 @@ describe("ticket edit route", () => {
   });
 
   it("renders the loaded ticket edit form fields", () => {
-    const html = renderToString(
-      <TicketEditView
-        data={{
-          status: "found",
-          userEmail: "user@example.com",
-          ticket: {
-            id: "ticket-1",
-            title: "Create service",
-            body: "Create a focused backend service",
-            type: "feature",
-            state: "backlog",
-            teamId: "team-1",
-            teamName: "Platform",
-            epicId: "epic-1",
-            epicTitle: "Launch Plan",
-            createdBy: userId,
-            createdByEmail: "user@example.com",
-            createdAt: "2026-06-30T10:00:00.000Z",
-            modifiedAt: "2026-06-30T10:30:00.000Z",
-          },
-          teams: [
-            {
-              id: "team-1",
-              name: "Platform",
-              normalizedName: "platform",
-              createdAt: "2026-06-30T10:00:00.000Z",
-              updatedAt: "2026-06-30T10:00:00.000Z",
-            },
-          ],
-          epics: [
-            {
-              id: "epic-1",
-              teamId: "team-1",
-              title: "Launch Plan",
-              description: "Coordinate the MVP launch",
-              createdAt: "2026-06-30T10:00:00.000Z",
-              updatedAt: "2026-06-30T10:00:00.000Z",
-            },
-          ],
-        }}
-      />,
-    );
+    const html = renderToString(<TicketEditView data={buildFoundEditData()} />);
 
     expect(html).toContain("Edit ticket");
     expect(html).toContain('name="teamId"');
@@ -324,6 +327,66 @@ describe("ticket edit route", () => {
     expect(html).toContain("Platform");
     expect(html).toContain("Launch Plan");
     expect(html).toContain("Save ticket");
+  });
+
+  it("populates form fields with the loaded ticket's initial values", () => {
+    const html = renderToString(<TicketEditView data={buildFoundEditData()} />);
+
+    expect(html).toContain('value="team-1" selected');
+    expect(html).toContain('value="epic-1" selected');
+    expect(html).toContain('value="feature" selected');
+    expect(html).toContain('value="backlog" selected');
+    expect(html).toContain('value="Create service"');
+    expect(html).toContain('Create a focused backend service');
+  });
+
+  it("shows only the epic options for the ticket's own team", () => {
+    const html = renderToString(
+      <TicketEditView
+        data={buildFoundEditData({
+          epics: [
+            {
+              id: "epic-1",
+              teamId: "team-1",
+              title: "Launch Plan",
+              description: "Coordinate the MVP launch",
+              createdAt: "2026-06-30T10:00:00.000Z",
+              updatedAt: "2026-06-30T10:00:00.000Z",
+            },
+            {
+              id: "epic-2",
+              teamId: "team-1",
+              title: "Rollout Plan",
+              description: "Coordinate the rollout",
+              createdAt: "2026-06-30T10:00:00.000Z",
+              updatedAt: "2026-06-30T10:00:00.000Z",
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(html).toContain("Launch Plan");
+    expect(html).toContain("Rollout Plan");
+    expect(html).not.toContain("Product Discovery");
+  });
+
+  it("shows the action validation error message", () => {
+    const html = renderToString(
+      <TicketEditView
+        actionData={{ message: "Ticket title is required.", status: "error" }}
+        data={buildFoundEditData()}
+      />,
+    );
+
+    expect(html).toContain("Ticket title is required.");
+  });
+
+  it("preserves navigation back to ticket details", () => {
+    const html = renderToString(<TicketEditView data={buildFoundEditData()} />);
+
+    expect(html).toContain('href="/tickets/ticket-1"');
+    expect(html).toContain("Back to ticket details");
   });
 
   it("redirects unauthenticated users away from the edit route", async () => {
