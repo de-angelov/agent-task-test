@@ -1,5 +1,8 @@
-import { useLoaderData } from "react-router";
+import { useActionData, useLoaderData } from "react-router";
+import { useEffect, useState } from "react";
 
+import { Button } from "~/components/button";
+import { Dialog } from "~/components/dialog";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
@@ -8,6 +11,11 @@ import { listTicketsForTeam, type TicketReadModel } from "~/services/tickets/tic
 import { listTeams, type Team } from "~/services/teams/teams.server";
 
 import { PlaceholderNotice, ScreenShell } from "../placeholders/placeholder-ui";
+import {
+  handleTicketCreateAction,
+  type TicketCreateActionData,
+} from "../tickets/new-action.server";
+import { TicketCreateFields } from "../tickets/create-fields";
 
 type LoaderData = {
   teams: Team[];
@@ -27,12 +35,6 @@ export function getBoardColumns(tickets: TicketReadModel[]): BoardColumn[] {
     state,
     tickets: tickets.filter((ticket) => ticket.state === state),
   }));
-}
-
-function getCreateTicketHref(selectedTeamId: string) {
-  return selectedTeamId === ""
-    ? "/tickets/new"
-    : `/tickets/new?teamId=${encodeURIComponent(selectedTeamId)}`;
 }
 
 export function meta() {
@@ -68,13 +70,22 @@ export async function loader({ request }: { request: Request }) {
   } satisfies LoaderData;
 }
 
+export async function action({ request }: { request: Request }) {
+  const user = await requireAuthenticatedUser(request);
+
+  return handleTicketCreateAction(db, user.id, await request.formData());
+}
+
 export function BoardView({
+  actionData,
   epics = [],
   selectedTeamId = "",
   teams = [],
   tickets = [],
   userEmail = "user@example.com",
-}: Partial<LoaderData> = {}) {
+}: Partial<LoaderData> & {
+  actionData?: TicketCreateActionData;
+} = {}) {
   const columns = getBoardColumns(tickets);
 
   return (
@@ -119,9 +130,12 @@ export function BoardView({
           <span>Search</span>
           <input name="search" type="search" />
         </label>
-        <a className="button-link" href={getCreateTicketHref(selectedTeamId)}>
-          Create ticket
-        </a>
+        <CreateTicketDialogEntry
+          actionData={actionData}
+          epics={epics}
+          selectedTeamId={selectedTeamId}
+          teams={teams}
+        />
       </section>
       <section className="kanban-board" aria-label="Ticket workflow">
         {columns.map((column) => (
@@ -147,8 +161,64 @@ export function BoardView({
   );
 }
 
+function CreateTicketDialogEntry({
+  actionData,
+  epics,
+  selectedTeamId,
+  teams,
+}: {
+  actionData?: TicketCreateActionData;
+  epics: Epic[];
+  selectedTeamId: string;
+  teams: Team[];
+}) {
+  const [isOpen, setIsOpen] = useState(Boolean(actionData));
+  const formId = "board-create-ticket-form";
+
+  useEffect(() => {
+    if (actionData) {
+      setIsOpen(true);
+    }
+  }, [actionData]);
+
+  return (
+    <>
+      <Button onClick={() => setIsOpen(true)}>Create ticket</Button>
+      <Dialog
+        cancelAction={
+          <Button onClick={() => setIsOpen(false)} variant="secondary">
+            Cancel
+          </Button>
+        }
+        confirmAction={
+          <Button form={formId} type="submit">
+            Create ticket
+          </Button>
+        }
+        isOpen={isOpen}
+        onCancel={() => setIsOpen(false)}
+        title="Create ticket"
+      >
+        {actionData ? (
+          <p className="placeholder-notice" role="alert">
+            {actionData.message}
+          </p>
+        ) : null}
+        <form className="form-panel" id={formId} method="post">
+          <TicketCreateFields
+            epics={epics}
+            selectedTeamId={selectedTeamId}
+            teams={teams}
+          />
+        </form>
+      </Dialog>
+    </>
+  );
+}
+
 export default function Board() {
   const data = useLoaderData<typeof loader>();
+  const actionData = useActionData() as TicketCreateActionData | undefined;
 
-  return <BoardView {...data} />;
+  return <BoardView {...data} actionData={actionData} />;
 }
