@@ -335,6 +335,84 @@ describe("board route", () => {
     expect(html).toContain("<span>No epic</span>");
   });
 
+  describe("board filter controls", () => {
+    const epicOption = {
+      id: "epic-1",
+      teamId: "team-1",
+      title: "Platform Launch",
+      description: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+
+    it("renders ticket type, epic, and search controls with no active filters", () => {
+      const html = renderToString(
+        <board.BoardView epics={[epicOption]} selectedTeamId="team-1" />,
+      );
+
+      expect(html).toContain('name="type"');
+      expect(html).toContain('name="epicId"');
+      expect(html).toContain('name="search"');
+      expect(html).toContain('<option value="" selected="">All types</option>');
+      expect(html).toContain('<option value="feature">feature</option>');
+      expect(html).toContain('<option value="bug">bug</option>');
+      expect(html).toContain('<option value="task">task</option>');
+      expect(html).toContain('<option value="" selected="">All epics</option>');
+      expect(html).toContain('<option value="epic-1">Platform Launch</option>');
+    });
+
+    it("reflects active filter values from the current URL query", () => {
+      const html = renderToString(
+        <board.BoardView
+          epics={[epicOption]}
+          filters={{ type: "bug", epicId: "epic-1", search: "login" }}
+          selectedTeamId="team-1"
+        />,
+      );
+
+      expect(html).toContain('<option value="bug" selected="">bug</option>');
+      expect(html).toContain(
+        '<option value="epic-1" selected="">Platform Launch</option>',
+      );
+      expect(html).toContain('value="login"');
+    });
+
+    it("renders a clear-filters action that resets the query for the selected team", () => {
+      const html = renderToString(
+        <board.BoardView selectedTeamId="team-1" />,
+      );
+
+      expect(html).toContain('href="/board?teamId=team-1"');
+      expect(html).toContain("Clear filters");
+    });
+
+    it("renders a clear-filters action without a team query when no team is selected", () => {
+      const html = renderToString(<board.BoardView />);
+
+      expect(html).toContain('href="/board"');
+      expect(html).toContain("Clear filters");
+    });
+
+    it("renders only the filtered tickets passed to the view in their columns", () => {
+      const bugTicket = makeTicketReadModel({
+        id: "ticket-1",
+        title: "Fix login redirect",
+        state: "todo",
+        type: "bug",
+      });
+
+      const html = renderToString(
+        <board.BoardView
+          filters={{ type: "bug", epicId: null, search: "" }}
+          tickets={[bugTicket]}
+        />,
+      );
+
+      expect(html).toContain("<strong>Fix login redirect</strong>");
+      expect(html.match(/class="ticket-card"/g)).toHaveLength(1);
+    });
+  });
+
   it("renders the create-ticket dialog entry instead of a primary link", () => {
     const html = renderToString(<board.BoardView selectedTeamId="team-1" />);
 

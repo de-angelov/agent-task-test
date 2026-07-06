@@ -35,6 +35,7 @@ type LoaderData = {
   epics: Epic[];
   tickets: TicketReadModel[];
   userEmail: string;
+  filters: BoardFilters;
 };
 
 type BoardColumn = {
@@ -98,9 +99,11 @@ export function meta() {
 export async function loader({ request }: { request: Request }) {
   const user = await requireAuthenticatedUser(request);
   const teams = listTeams(db);
-  const requestedTeamId = new URL(request.url).searchParams.get("teamId") ?? "";
+  const searchParams = new URL(request.url).searchParams;
+  const requestedTeamId = searchParams.get("teamId") ?? "";
   const selectedTeam = teams.find((team) => team.id === requestedTeamId);
   const selectedTeamId = selectedTeam?.id ?? teams[0]?.id ?? "";
+  const filters = parseBoardFilters(searchParams);
 
   if (selectedTeamId === "") {
     return {
@@ -109,12 +112,12 @@ export async function loader({ request }: { request: Request }) {
       epics: [],
       tickets: [],
       userEmail: user.email,
+      filters,
     } satisfies LoaderData;
   }
 
   const epics = listEpics(db, { teamId: selectedTeamId });
   const tickets = listTicketsForTeam(db, { teamId: selectedTeamId });
-  const filters = parseBoardFilters(new URL(request.url).searchParams);
 
   return {
     teams,
@@ -122,6 +125,7 @@ export async function loader({ request }: { request: Request }) {
     epics,
     tickets: filterTickets(tickets, filters),
     userEmail: user.email,
+    filters,
   } satisfies LoaderData;
 }
 
@@ -202,6 +206,7 @@ function normalizeOptionalFormValue(value: FormDataEntryValue | null) {
 export function BoardView({
   actionData,
   epics = [],
+  filters = { type: null, epicId: null, search: "" },
   selectedTeamId = "",
   teams = [],
   tickets = [],
@@ -210,49 +215,59 @@ export function BoardView({
   actionData?: TicketCreateActionData;
 } = {}) {
   const columns = getBoardColumns(tickets);
+  const clearFiltersHref = selectedTeamId
+    ? `/board?teamId=${selectedTeamId}`
+    : "/board";
 
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
       <PlaceholderNotice>
-        Team selection, filtering, and drag-and-drop persistence will connect to
-        backend services later.
+        Drag-and-drop persistence will connect to backend services later.
       </PlaceholderNotice>
       <section className="toolbar" aria-label="Board filters">
-        <label className="form-field">
-          <span>Team</span>
-          <select defaultValue={selectedTeamId} name="team">
-            {teams.length === 0 ? <option value="">No teams available</option> : null}
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Ticket type</span>
-          <select name="type">
-            <option>All types</option>
-            <option>bug</option>
-            <option>feature</option>
-            <option>fix</option>
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Epic</span>
-          <select name="epic">
-            <option>All epics</option>
-            {epics.map((epic) => (
-              <option key={epic.id} value={epic.id}>
-                {epic.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Search</span>
-          <input name="search" type="search" />
-        </label>
+        <form className="form-panel" method="get">
+          <label className="form-field">
+            <span>Team</span>
+            <select defaultValue={selectedTeamId} name="teamId">
+              {teams.length === 0 ? <option value="">No teams available</option> : null}
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Ticket type</span>
+            <select defaultValue={filters.type ?? ""} name="type">
+              <option value="">All types</option>
+              {ticketTypes.map((ticketType) => (
+                <option key={ticketType} value={ticketType}>
+                  {ticketType}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Epic</span>
+            <select defaultValue={filters.epicId ?? ""} name="epicId">
+              <option value="">All epics</option>
+              {epics.map((epic) => (
+                <option key={epic.id} value={epic.id}>
+                  {epic.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Search</span>
+            <input defaultValue={filters.search} name="search" type="search" />
+          </label>
+          <Button type="submit" variant="secondary">
+            Apply filters
+          </Button>
+          <a href={clearFiltersHref}>Clear filters</a>
+        </form>
         <CreateTicketDialogEntry
           actionData={actionData}
           epics={epics}
