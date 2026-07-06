@@ -13,6 +13,10 @@ import {
 } from "~/services/comments/comments.server";
 import type { AppDb } from "~/services/teams/teams.server";
 import {
+  listTicketActivity,
+  type TicketActivityReadModel,
+} from "~/services/ticket-activity/ticket-activity.server";
+import {
   deleteTicket,
   getTicketById,
   mapTicketDeleteError,
@@ -23,6 +27,7 @@ export type TicketDetailsFound = {
   status: "found";
   ticket: TicketReadModel;
   comments: CommentReadModel[];
+  activity: TicketActivityReadModel[];
   currentUserId: string;
   userEmail: string;
 };
@@ -79,6 +84,7 @@ export function readTicketDetails(
     status: "found",
     ticket: ticket.value,
     comments: listTicketComments(database, { ticketId: ticket.value.id }),
+    activity: listTicketActivity(database, { ticketId: ticket.value.id }),
     currentUserId,
     userEmail,
   };

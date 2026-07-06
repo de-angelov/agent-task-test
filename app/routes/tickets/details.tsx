@@ -6,6 +6,7 @@ import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
 import type { CommentReadModel } from "~/services/comments/comments.server";
+import type { TicketActivityReadModel } from "~/services/ticket-activity/ticket-activity.server";
 import type { TicketReadModel } from "~/services/tickets/tickets.server";
 
 import {
@@ -70,6 +71,42 @@ function getStateLabel(state: TicketReadModel["state"]) {
     .with("in-progress", () => "In progress")
     .with("done", () => "Done")
     .exhaustive();
+}
+
+function getActivityActionLabel(actionType: string) {
+  return match(actionType)
+    .with("created", () => "Ticket created")
+    .with("state-changed", () => "State changed")
+    .with("title-changed", () => "Title changed")
+    .with("body-changed", () => "Body changed")
+    .with("team-changed", () => "Team changed")
+    .with("epic-changed", () => "Epic changed")
+    .with("deleted", () => "Ticket deleted")
+    .otherwise(() => actionType);
+}
+
+function TicketActivityList({ activity }: { activity: TicketActivityReadModel[] }) {
+  return (
+    <section className="details-list">
+      <h2>Activity</h2>
+      {activity.length === 0 ? (
+        <p role="status">No activity yet.</p>
+      ) : (
+        <ul>
+          {activity.map((entry) => (
+            <li key={entry.id}>
+              <p>
+                <strong>{getActivityActionLabel(entry.actionType)}</strong>{" "}
+                by {entry.actorEmail}{" "}
+                <time dateTime={entry.createdAt}>{entry.createdAt}</time>
+              </p>
+              {entry.detail ? <p>{entry.detail}</p> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
@@ -257,6 +294,7 @@ export function TicketDetailsView({
             currentUserId={data.currentUserId}
           />
           <AddCommentDialogEntry actionData={addCommentActionData} />
+          <TicketActivityList activity={data.activity} />
         </>
       ) : (
         <p role="status">Ticket {data.ticketId} was not found.</p>
