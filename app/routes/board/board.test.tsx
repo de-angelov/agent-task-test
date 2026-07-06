@@ -284,15 +284,63 @@ describe("board route", () => {
     const html = renderToString(<board.BoardView tickets={[]} />);
 
     expect(html.match(/class="kanban-column"/g)).toHaveLength(4);
-    expect(html.indexOf("<h2>backlog</h2>")).toBeLessThan(
-      html.indexOf("<h2>todo</h2>"),
+    expect(html.indexOf("<h2>backlog (0)</h2>")).toBeLessThan(
+      html.indexOf("<h2>todo (0)</h2>"),
     );
-    expect(html.indexOf("<h2>todo</h2>")).toBeLessThan(
-      html.indexOf("<h2>in-progress</h2>"),
+    expect(html.indexOf("<h2>todo (0)</h2>")).toBeLessThan(
+      html.indexOf("<h2>in-progress (0)</h2>"),
     );
-    expect(html.indexOf("<h2>in-progress</h2>")).toBeLessThan(
-      html.indexOf("<h2>done</h2>"),
+    expect(html.indexOf("<h2>in-progress (0)</h2>")).toBeLessThan(
+      html.indexOf("<h2>done (0)</h2>"),
     );
+  });
+
+  it("renders a per-column ticket count alongside the workflow state", () => {
+    const backlogTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Backlog ticket",
+      state: "backlog",
+    });
+    const anotherBacklogTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Another backlog ticket",
+      state: "backlog",
+    });
+    const doneTicket = makeTicketReadModel({
+      id: "ticket-3",
+      title: "Done ticket",
+      state: "done",
+    });
+
+    const html = renderToString(
+      <board.BoardView
+        tickets={[backlogTicket, anotherBacklogTicket, doneTicket]}
+      />,
+    );
+
+    expect(html).toContain("<h2>backlog (2)</h2>");
+    expect(html).toContain("<h2>todo (0)</h2>");
+    expect(html).toContain("<h2>in-progress (0)</h2>");
+    expect(html).toContain("<h2>done (1)</h2>");
+  });
+
+  it("renders the total ticket count across all columns", () => {
+    const backlogTicket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Backlog ticket",
+      state: "backlog",
+    });
+    const doneTicket = makeTicketReadModel({
+      id: "ticket-2",
+      title: "Done ticket",
+      state: "done",
+    });
+
+    const html = renderToString(
+      <board.BoardView tickets={[backlogTicket, doneTicket]} />,
+    );
+
+    expect(html).toContain("Total tickets: 2");
   });
 
   it("renders the authenticated shell navigation with the signed-in user's email", () => {
@@ -359,11 +407,26 @@ describe("board route", () => {
     expect(html).toContain('<strong>Backlog ticket</strong>');
     expect(html).toContain("<span>bug</span>");
     expect(html).toContain("<span>Platform Launch</span>");
-    expect(html.indexOf("<h2>backlog</h2>")).toBeLessThan(
+    expect(html.indexOf("<h2>backlog (1)</h2>")).toBeLessThan(
       html.indexOf("<strong>Backlog ticket</strong>"),
     );
-    expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
+    expect(html.indexOf("<h2>done (1)</h2>")).toBeLessThan(
       html.indexOf("<strong>Done ticket</strong>"),
+    );
+  });
+
+  it("renders each card's modified timestamp", () => {
+    const ticket = makeTicketReadModel({
+      id: "ticket-1",
+      title: "Backlog ticket",
+      state: "backlog",
+      modifiedAt: "2026-06-30T11:00:00.000Z",
+    });
+
+    const html = renderToString(<board.BoardView tickets={[ticket]} />);
+
+    expect(html).toContain(
+      '<time dateTime="2026-06-30T11:00:00.000Z">2026-06-30T11:00:00.000Z</time>',
     );
   });
 
@@ -455,7 +518,7 @@ describe("board route", () => {
 
       const html = renderToString(<board.BoardView tickets={ticketsAfterDrop} />);
 
-      expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
+      expect(html.indexOf("<h2>done (1)</h2>")).toBeLessThan(
         html.indexOf("<strong>Backlog ticket</strong>"),
       );
     });
@@ -697,6 +760,19 @@ describe("board route", () => {
     expect(html).toContain('id="board-create-ticket-form"');
     expect(html).toContain('method="post"');
     expect(html).not.toContain('href="/tickets/new?teamId=team-1"');
+  });
+
+  it("renders the new-ticket action in its own section ahead of the filters", () => {
+    const html = renderToString(<board.BoardView selectedTeamId="team-1" />);
+
+    const actionsIndex = html.indexOf('aria-label="Board actions"');
+    const filtersIndex = html.indexOf('aria-label="Board filters"');
+    const createButtonIndex = html.indexOf(">Create ticket</button>");
+
+    expect(actionsIndex).toBeGreaterThan(-1);
+    expect(actionsIndex).toBeLessThan(filtersIndex);
+    expect(createButtonIndex).toBeGreaterThan(actionsIndex);
+    expect(createButtonIndex).toBeLessThan(filtersIndex);
   });
 
   it("renders the create fields in the board dialog with same-team epic options", () => {
