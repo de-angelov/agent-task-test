@@ -109,32 +109,40 @@ function TicketActivityList({ activity }: { activity: TicketActivityReadModel[] 
   );
 }
 
+function TicketHeader({ ticket }: { ticket: TicketReadModel }) {
+  return (
+    <section aria-label="Ticket header" className="toolbar">
+      <h2>{ticket.title}</h2>
+      <span>{`Type: ${ticket.type}`}</span>
+      <span>{`State: ${getStateLabel(ticket.state)}`}</span>
+      {ticket.epicTitle ? <span>{`Epic: ${ticket.epicTitle}`}</span> : null}
+    </section>
+  );
+}
+
 function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
   return (
-    <dl className="details-list">
-      <dt>Title</dt>
-      <dd>{ticket.title}</dd>
-      <dt>Body</dt>
-      <dd>{ticket.body}</dd>
-      <dt>Type</dt>
-      <dd>{ticket.type}</dd>
-      <dt>Team</dt>
-      <dd>{ticket.teamName}</dd>
-      <dt>Epic</dt>
-      <dd>{ticket.epicTitle ?? "No epic"}</dd>
-      <dt>State</dt>
-      <dd>{getStateLabel(ticket.state)}</dd>
-      <dt>Created by</dt>
-      <dd>{ticket.createdByEmail}</dd>
-      <dt>Created timestamp</dt>
-      <dd>
-        <time dateTime={ticket.createdAt}>{ticket.createdAt}</time>
-      </dd>
-      <dt>Modified timestamp</dt>
-      <dd>
-        <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
-      </dd>
-    </dl>
+    <section className="details-list">
+      <h2>Details</h2>
+      <dl>
+        <dt>Body</dt>
+        <dd>{ticket.body}</dd>
+        <dt>Team</dt>
+        <dd>{ticket.teamName}</dd>
+        <dt>Epic</dt>
+        <dd>{ticket.epicTitle ?? "No epic"}</dd>
+        <dt>Created by</dt>
+        <dd>{ticket.createdByEmail}</dd>
+        <dt>Created timestamp</dt>
+        <dd>
+          <time dateTime={ticket.createdAt}>{ticket.createdAt}</time>
+        </dd>
+        <dt>Modified timestamp</dt>
+        <dd>
+          <time dateTime={ticket.modifiedAt}>{ticket.modifiedAt}</time>
+        </dd>
+      </dl>
+    </section>
   );
 }
 
@@ -275,20 +283,23 @@ export function TicketDetailsView({
       ) : null}
       {data.status === "found" ? (
         <>
+          <TicketHeader ticket={data.ticket} />
           <TicketDetailsFields ticket={data.ticket} />
-          <a className="button-link" href={`/tickets/${data.ticket.id}/edit`}>
-            Edit ticket
-          </a>
-          <form className="form-panel" method="post">
-            <h2>Delete ticket</h2>
-            <label className="form-field">
-              <input name="confirmDelete" type="checkbox" value="yes" />
-              <span>Confirm deletion</span>
-            </label>
-            <Button type="submit" variant="destructive">
-              Delete ticket
-            </Button>
-          </form>
+          <section aria-label="Ticket actions" className="toolbar">
+            <a className="button-link" href={`/tickets/${data.ticket.id}/edit`}>
+              Edit ticket
+            </a>
+            <form className="form-panel" method="post">
+              <h2>Delete ticket</h2>
+              <label className="form-field">
+                <input name="confirmDelete" type="checkbox" value="yes" />
+                <span>Confirm deletion</span>
+              </label>
+              <Button type="submit" variant="destructive">
+                Delete ticket
+              </Button>
+            </form>
+          </section>
           <TicketComments
             comments={data.comments}
             currentUserId={data.currentUserId}
