@@ -1,6 +1,16 @@
 import { data, useActionData, useLoaderData } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { match } from "ts-pattern";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
@@ -48,6 +58,18 @@ export function getBoardColumns(tickets: TicketReadModel[]): BoardColumn[] {
     state,
     tickets: tickets.filter((ticket) => ticket.state === state),
   }));
+}
+
+export function moveTicketState(
+  tickets: TicketReadModel[],
+  ticketId: string,
+  targetState: TicketState,
+): TicketReadModel[] {
+  return tickets.map((ticket) =>
+    ticket.id === ticketId && ticket.state !== targetState
+      ? { ...ticket, state: targetState }
+      : ticket,
+  );
 }
 
 export type BoardFilters = {
@@ -214,10 +236,32 @@ export function BoardView({
 }: Partial<LoaderData> & {
   actionData?: TicketCreateActionData;
 } = {}) {
-  const columns = getBoardColumns(tickets);
+  const [localTickets, setLocalTickets] = useState(tickets);
+
+  useEffect(() => {
+    setLocalTickets(tickets);
+  }, [tickets]);
+
+  const columns = getBoardColumns(localTickets);
   const clearFiltersHref = selectedTeamId
     ? `/board?teamId=${selectedTeamId}`
     : "/board";
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const targetState = ticketStates.find((state) => state === event.over?.id);
+
+    if (!targetState) {
+      return;
+    }
+
+    setLocalTickets((currentTickets) =>
+      moveTicketState(currentTickets, String(event.active.id), targetState),
+    );
+  }
 
   return (
     <ScreenShell title="Kanban board" userEmail={userEmail}>
@@ -275,27 +319,61 @@ export function BoardView({
           teams={teams}
         />
       </section>
-      <section className="kanban-board" aria-label="Ticket workflow">
-        {columns.map((column) => (
-          <article className="kanban-column" key={column.state}>
-            <h2>{column.state}</h2>
-            {column.tickets.map((ticket) => (
-              <a
-                aria-label={`Open ticket ${ticket.title}`}
-                className="ticket-card"
-                href={`/tickets/${ticket.id}`}
-                key={ticket.id}
-              >
-                <strong>{ticket.title}</strong>
-                <span>{ticket.type}</span>
-                <span>{ticket.epicTitle ?? "No epic"}</span>
-                <span>Open ticket</span>
-              </a>
-            ))}
-          </article>
-        ))}
-      </section>
+      <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
+        <section className="kanban-board" aria-label="Ticket workflow">
+          {columns.map((column) => (
+            <BoardColumnDropZone key={column.state} state={column.state}>
+              {column.tickets.map((ticket) => (
+                <DraggableTicketCard key={ticket.id} ticket={ticket} />
+              ))}
+            </BoardColumnDropZone>
+          ))}
+        </section>
+      </DndContext>
     </ScreenShell>
+  );
+}
+
+function BoardColumnDropZone({
+  children,
+  state,
+}: {
+  children: ReactNode;
+  state: TicketState;
+}) {
+  const { setNodeRef } = useDroppable({ id: state });
+
+  return (
+    <article className="kanban-column" ref={setNodeRef}>
+      <h2>{state}</h2>
+      {children}
+    </article>
+  );
+}
+
+function DraggableTicketCard({ ticket }: { ticket: TicketReadModel }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: ticket.id,
+  });
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : undefined;
+
+  return (
+    <a
+      aria-label={`Open ticket ${ticket.title}`}
+      className="ticket-card"
+      href={`/tickets/${ticket.id}`}
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      <strong>{ticket.title}</strong>
+      <span>{ticket.type}</span>
+      <span>{ticket.epicTitle ?? "No epic"}</span>
+      <span>Open ticket</span>
+    </a>
   );
 }
 

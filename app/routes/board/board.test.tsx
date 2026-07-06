@@ -347,6 +347,96 @@ describe("board route", () => {
     expect(html).toContain("<span>No epic</span>");
   });
 
+  describe("board drag interaction", () => {
+    it("marks ticket cards as keyboard-operable dnd-kit draggables", () => {
+      const ticket = makeTicketReadModel({
+        id: "ticket-1",
+        title: "Backlog ticket",
+        state: "backlog",
+      });
+
+      const html = renderToString(<board.BoardView tickets={[ticket]} />);
+
+      expect(html).toContain('role="button"');
+      expect(html).toContain('tabindex="0"');
+      expect(html).toContain('aria-roledescription="draggable"');
+    });
+
+    describe("moveTicketState", () => {
+      it("moves a ticket to the column it was dropped on", () => {
+        const ticket = makeTicketReadModel({
+          id: "ticket-1",
+          title: "Backlog ticket",
+          state: "backlog",
+        });
+
+        expect(board.moveTicketState([ticket], "ticket-1", "done")).toEqual([
+          { ...ticket, state: "done" },
+        ]);
+      });
+
+      it("is a no-op when dropped back on its own column", () => {
+        const ticket = makeTicketReadModel({
+          id: "ticket-1",
+          title: "Backlog ticket",
+          state: "backlog",
+        });
+
+        const moved = board.moveTicketState([ticket], "ticket-1", "backlog");
+
+        expect(moved[0]).toBe(ticket);
+      });
+
+      it("leaves tickets other than the dragged one untouched", () => {
+        const movedTicket = makeTicketReadModel({
+          id: "ticket-1",
+          title: "Moved ticket",
+          state: "backlog",
+        });
+        const otherTicket = makeTicketReadModel({
+          id: "ticket-2",
+          title: "Other ticket",
+          state: "todo",
+        });
+
+        const moved = board.moveTicketState(
+          [movedTicket, otherTicket],
+          movedTicket.id,
+          "done",
+        );
+
+        expect(moved[1]).toBe(otherTicket);
+      });
+    });
+
+    // This repo has no jsdom/testing-library, so real pointer/keyboard DOM events
+    // can't be dispatched here. @dnd-kit's KeyboardSensor drives a card move by
+    // calling the same onDragEnd handler (backed by moveTicketState) that the
+    // pointer sensor does, so this exercises that state transition directly and
+    // renders the result, matching this file's existing SSR-only test pattern.
+    it("renders a card under its target column after a keyboard-driven cross-column move completes", () => {
+      const ticket = makeTicketReadModel({
+        id: "ticket-1",
+        title: "Backlog ticket",
+        state: "backlog",
+      });
+
+      const ticketsAfterKeyboardMove = board.moveTicketState(
+        [ticket],
+        ticket.id,
+        "done",
+      );
+
+      const html = renderToString(
+        <board.BoardView tickets={ticketsAfterKeyboardMove} />,
+      );
+
+      expect(html.indexOf("<h2>done</h2>")).toBeLessThan(
+        html.indexOf("<strong>Backlog ticket</strong>"),
+      );
+    });
+  });
+
   describe("board filter controls", () => {
     const epicOption = {
       id: "epic-1",
