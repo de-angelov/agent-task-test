@@ -421,6 +421,137 @@ describe("ticket details route", () => {
     expect(html).toContain("Confirm deletion before deleting this ticket.");
   });
 
+  it("renders comments in chronological order with author and timestamp", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [
+        {
+          id: "comment-1",
+          ticketId: "ticket-1",
+          authorId: userId,
+          authorEmail: "user@example.com",
+          body: "First comment",
+          createdAt: "2026-06-30T10:15:00.000Z",
+        },
+        {
+          id: "comment-2",
+          ticketId: "ticket-1",
+          authorId: "user-2",
+          authorEmail: "reviewer@example.com",
+          body: "Second comment",
+          createdAt: "2026-06-30T10:30:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("Comments");
+    expect(html.indexOf("First comment")).toBeLessThan(
+      html.indexOf("Second comment"),
+    );
+    expect(html).toContain("user@example.com");
+    expect(html).toContain("reviewer@example.com");
+    expect(html).toContain('<time dateTime="2026-06-30T10:15:00.000Z">');
+    expect(html).toContain('<time dateTime="2026-06-30T10:30:00.000Z">');
+  });
+
+  it("renders a message when there are no comments yet", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+    });
+
+    expect(html).toContain("No comments yet.");
+  });
+
+  it("renders an add-comment form", () => {
+    const html = renderDetails({
+      status: "found",
+      ticket: {
+        id: "ticket-1",
+        title: "Create service",
+        body: "Create a focused backend service",
+        type: "feature",
+        state: "backlog",
+        teamId: "team-1",
+        teamName: "Platform",
+        epicId: null,
+        epicTitle: null,
+        createdBy: userId,
+        createdByEmail: "user@example.com",
+        createdAt: "2026-06-30T10:00:00.000Z",
+        modifiedAt: "2026-06-30T10:30:00.000Z",
+      },
+      comments: [],
+    });
+
+    expect(html).toContain("Add comment");
+    expect(html).toContain('name="intent"');
+    expect(html).toContain('value="add-comment"');
+    expect(html).toContain('name="body"');
+    expect(html).toMatch(/<textarea[^>]*name="body"/);
+  });
+
+  it("renders validation errors returned by the add-comment action", () => {
+    const html = renderDetails(
+      {
+        status: "found",
+        ticket: {
+          id: "ticket-1",
+          title: "Create service",
+          body: "Create a focused backend service",
+          type: "feature",
+          state: "backlog",
+          teamId: "team-1",
+          teamName: "Platform",
+          epicId: null,
+          epicTitle: null,
+          createdBy: userId,
+          createdByEmail: "user@example.com",
+          createdAt: "2026-06-30T10:00:00.000Z",
+          modifiedAt: "2026-06-30T10:30:00.000Z",
+        },
+        comments: [],
+      },
+      {
+        message: "Comment cannot be empty.",
+        status: "error",
+      },
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Comment cannot be empty.");
+  });
+
   it.each([
     ["backlog", "Backlog"],
     ["todo", "Todo"],

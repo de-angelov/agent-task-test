@@ -3,6 +3,7 @@ import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
+import type { CommentReadModel } from "~/services/comments/comments.server";
 import type { TicketReadModel } from "~/services/tickets/tickets.server";
 
 import {
@@ -88,6 +89,45 @@ function TicketDetailsFields({ ticket }: { ticket: TicketReadModel }) {
   );
 }
 
+function TicketComments({ comments }: { comments: CommentReadModel[] }) {
+  return (
+    <section className="details-list">
+      <h2>Comments</h2>
+      {comments.length === 0 ? (
+        <p role="status">No comments yet.</p>
+      ) : (
+        <ul>
+          {comments.map((comment) => (
+            <li key={comment.id}>
+              <p>
+                <strong>{comment.authorEmail}</strong>{" "}
+                <time dateTime={comment.createdAt}>{comment.createdAt}</time>
+              </p>
+              <p>{comment.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AddCommentForm() {
+  return (
+    <form className="form-panel" method="post">
+      <h2>Add comment</h2>
+      <input name="intent" type="hidden" value="add-comment" />
+      <label className="form-field">
+        <span>Comment</span>
+        <textarea name="body" rows={4} />
+      </label>
+      <Button type="submit" variant="primary">
+        Add comment
+      </Button>
+    </form>
+  );
+}
+
 export function TicketDetailsView({
   actionData,
   data,
@@ -118,6 +158,8 @@ export function TicketDetailsView({
               Delete ticket
             </Button>
           </form>
+          <TicketComments comments={data.comments} />
+          <AddCommentForm />
         </>
       ) : (
         <p role="status">Ticket {data.ticketId} was not found.</p>
