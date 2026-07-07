@@ -7,7 +7,7 @@
 }
 
 .panel {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -17,7 +17,7 @@
 }
 
 .header {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   padding: 10px;
 }
 
@@ -27,16 +27,19 @@
 }
 
 .notice {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   margin: 0;
   padding: 10px;
 }
 
 .success {
-  color: green;
+  color: var(--color-success);
 }
 
 .error {
+  /* Not var(--color-danger): that token flips to #ff9b9b in dark mode via
+     prefers-color-scheme, but this rule has no dark variant and must stay
+     #8b0000 in both modes to keep rendered output unchanged. */
   color: #8b0000;
 }
 
@@ -45,7 +48,7 @@
 }
 
 .form {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -53,7 +56,7 @@
 }
 
 .field {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -61,7 +64,7 @@
 }
 
 .links {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 10px;

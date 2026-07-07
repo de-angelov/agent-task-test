@@ -1,26 +1,26 @@
 .button {
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
   cursor: pointer;
   padding: 10px;
 }
 
 .primary {
-  background: black;
-  color: white;
+  background: var(--color-text);
+  color: var(--color-surface);
 }
 
 .secondary {
-  background: white;
-  color: black;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .destructive {
-  background: white;
-  color: #8b0000;
+  background: var(--color-surface);
+  color: var(--color-danger);
 }
 
 .button:focus-visible {
-  outline: 2px solid black;
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
@@ -29,33 +29,7 @@
 }
 
 .button:disabled {
-  background: #eeeeee;
-  color: #555555;
+  background: var(--color-disabled-surface);
+  color: var(--color-disabled-text);
   cursor: not-allowed;
-}
-
-@media (prefers-color-scheme: dark) {
-  .primary {
-    background: white;
-    color: black;
-  }
-
-  .secondary {
-    background: black;
-    color: white;
-  }
-
-  .destructive {
-    background: black;
-    color: #ff9b9b;
-  }
-
-  .button:focus-visible {
-    outline-color: white;
-  }
-
-  .button:disabled {
-    background: #222222;
-    color: #aaaaaa;
-  }
 }

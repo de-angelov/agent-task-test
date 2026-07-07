@@ -1,7 +1,7 @@
 .dialog {
-  background: white;
-  border: 1px solid grey;
-  color: black;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   padding: 10px;
 }
 
@@ -15,11 +15,4 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .dialog {
-    background: black;
-    color: white;
-  }
 }

@@ -1,20 +1,28 @@
 body {
-  background: var(--page-background);
-  color: var(--page-color);
+  background: var(--color-surface);
+  color: var(--color-text);
   margin: 0;
 }
 
 :root {
   color-scheme: light;
-  --page-background: white;
-  --page-color: black;
+  --color-border: grey;
+  --color-surface: white;
+  --color-text: black;
+  --color-danger: #8b0000;
+  --color-success: green;
+  --color-disabled-surface: #eeeeee;
+  --color-disabled-text: #555555;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --page-background: black;
-    --page-color: white;
+    --color-surface: black;
+    --color-text: white;
+    --color-danger: #ff9b9b;
+    --color-disabled-surface: #222222;
+    --color-disabled-text: #aaaaaa;
   }
 }
 
@@ -23,7 +31,7 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
 }
 
 .top-links,
@@ -39,7 +47,7 @@ body {
   display: flex;
   gap: 10px;
   padding: 10px;
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
 }
 
 .top-links,
@@ -61,5 +69,5 @@ body {
 .placeholder-notice,
 .button-link {
   padding: 10px;
-  border: 1px solid grey;
+  border: 1px solid var(--color-border);
 }
