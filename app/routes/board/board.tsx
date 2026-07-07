@@ -1,4 +1,10 @@
-import { data, useActionData, useLoaderData } from "react-router";
+import {
+  data,
+  useActionData,
+  useFetcher,
+  useLoaderData,
+  type FetcherWithComponents,
+} from "react-router";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { match } from "ts-pattern";
 
@@ -62,40 +68,84 @@ export function moveTicketState(
   );
 }
 
-export type TicketDropOutcome =
-  | { outcome: "persisted" }
-  | { outcome: "rolled-back"; ticketId: string; previousState: TicketState; message: string };
-
-export async function persistTicketDrop(input: {
+export type DragPersistInput = {
   ticketId: string;
   targetState: TicketState;
   previousState: TicketState;
   expectedModifiedAt: string | null;
-}): Promise<TicketDropOutcome> {
-  const rollback = (message: string): TicketDropOutcome => ({
-    outcome: "rolled-back",
-    ticketId: input.ticketId,
-    previousState: input.previousState,
-    message,
+};
+
+type DragFetcher = FetcherWithComponents<TicketStateUpdateActionData>;
+
+function dragFetcherKey(ticketId: string) {
+  return `board-ticket-drag-${ticketId}`;
+}
+
+// One keyed fetcher per ticket, so submitting a new drag for a ticket
+// supersedes that ticket's own in-flight request without affecting other
+// tickets being dragged concurrently. Rendered by Board (not BoardView) so
+// BoardView keeps rendering outside a router context for its render tests.
+function TicketDragFetcher({
+  onFetcherChange,
+  ticketId,
+}: {
+  onFetcherChange: (ticketId: string, fetcher: DragFetcher) => void;
+  ticketId: string;
+}) {
+  const fetcher = useFetcher<TicketStateUpdateActionData>({ key: dragFetcherKey(ticketId) });
+
+  useEffect(() => {
+    onFetcherChange(ticketId, fetcher);
   });
 
-  const formData = new FormData();
-  formData.set("intent", "update-state");
-  formData.set("ticketId", input.ticketId);
-  formData.set("state", input.targetState);
+  return null;
+}
 
-  if (input.expectedModifiedAt !== null) {
-    formData.set("expectedModifiedAt", input.expectedModifiedAt);
+function useTicketDragPersistence(tickets: TicketReadModel[]) {
+  const fetchersRef = useRef(new Map<string, DragFetcher>());
+  const previousFetcherStatesRef = useRef(new Map<string, DragFetcher["state"]>());
+  const [dragError, setDragError] = useState<string | null>(null);
+
+  function handleFetcherChange(ticketId: string, fetcher: DragFetcher) {
+    fetchersRef.current.set(ticketId, fetcher);
+
+    const previousState = previousFetcherStatesRef.current.get(ticketId);
+    previousFetcherStatesRef.current.set(ticketId, fetcher.state);
+
+    const hasSettled = previousState !== undefined && previousState !== "idle" && fetcher.state === "idle";
+
+    if (hasSettled && fetcher.data?.status === "error") {
+      setDragError(fetcher.data.message);
+    }
   }
 
-  try {
-    const response = await fetch("/board", { method: "POST", body: formData });
-    const result = (await response.json()) as TicketStateUpdateActionData;
+  function persistDrop(input: DragPersistInput) {
+    const fetcher = fetchersRef.current.get(input.ticketId);
 
-    return result.status === "error" ? rollback(result.message) : { outcome: "persisted" };
-  } catch {
-    return rollback("Unable to save the ticket move. Try again.");
+    if (!fetcher) {
+      return;
+    }
+
+    setDragError(null);
+
+    const formData = new FormData();
+    formData.set("intent", "update-state");
+    formData.set("ticketId", input.ticketId);
+    formData.set("state", input.targetState);
+
+    if (input.expectedModifiedAt !== null) {
+      formData.set("expectedModifiedAt", input.expectedModifiedAt);
+    }
+
+    void fetcher.submit(formData, { method: "post" });
   }
+
+  return {
+    dragError,
+    onFetcherChange: handleFetcherChange,
+    persistDrop,
+    ticketIds: tickets.map((ticket) => ticket.id),
+  };
 }
 
 export type BoardFilters = {
@@ -253,20 +303,20 @@ function normalizeOptionalFormValue(value: FormDataEntryValue | null) {
 
 export function BoardView({
   actionData,
+  dragError = null,
   epics = [],
   filters = { type: null, epicId: null, search: "" },
+  persistDrop = () => {},
   selectedTeamId = "",
   teams = [],
   tickets = [],
   userEmail = "user@example.com",
 }: Partial<LoaderData> & {
   actionData?: TicketCreateActionData;
+  dragError?: string | null;
+  persistDrop?: (input: DragPersistInput) => void;
 } = {}) {
   const [localTickets, setLocalTickets] = useState(tickets);
-  const [dragError, setDragError] = useState<string | null>(null);
-  // Tracks the newest in-flight persistence request per ticket so a slow or
-  // failed request can't roll back a move that a later drag already applied.
-  const latestDragRequestRef = useRef(new Map<string, number>());
 
   useEffect(() => {
     setLocalTickets(tickets);
@@ -292,29 +342,16 @@ export function BoardView({
     }
 
     const previousState = ticket.state;
-    const requestId = (latestDragRequestRef.current.get(ticketId) ?? 0) + 1;
-    latestDragRequestRef.current.set(ticketId, requestId);
 
-    setDragError(null);
     setLocalTickets((currentTickets) =>
       moveTicketState(currentTickets, ticketId, targetState),
     );
 
-    void persistTicketDrop({
+    persistDrop({
       ticketId,
       targetState,
       previousState,
       expectedModifiedAt: null,
-    }).then((outcome) => {
-      const isLatestRequestForTicket =
-        latestDragRequestRef.current.get(ticketId) === requestId;
-
-      if (isLatestRequestForTicket && outcome.outcome === "rolled-back") {
-        setLocalTickets((currentTickets) =>
-          moveTicketState(currentTickets, outcome.ticketId, outcome.previousState),
-        );
-        setDragError(outcome.message);
-      }
     });
   }
 
@@ -496,6 +533,16 @@ function CreateTicketDialogEntry({
 export default function Board() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData() as TicketCreateActionData | undefined;
+  const { dragError, onFetcherChange, persistDrop, ticketIds } = useTicketDragPersistence(
+    data.tickets,
+  );
 
-  return <BoardView {...data} actionData={actionData} />;
+  return (
+    <>
+      {ticketIds.map((ticketId) => (
+        <TicketDragFetcher key={ticketId} onFetcherChange={onFetcherChange} ticketId={ticketId} />
+      ))}
+      <BoardView {...data} actionData={actionData} dragError={dragError} persistDrop={persistDrop} />
+    </>
+  );
 }
