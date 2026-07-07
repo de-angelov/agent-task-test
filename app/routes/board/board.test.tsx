@@ -775,7 +775,7 @@ describe("board route", () => {
     expect(todoColumn?.tickets).toEqual([newerTodoTicket, olderTodoTicket]);
   });
 
-  it("groups and renders a large ticket set without error", () => {
+  it("groups a large ticket set and renders only the visible windowed subset per column", () => {
     const states: TicketState[] = ["backlog", "todo", "in-progress", "done"];
     const tickets = Array.from({ length: 2000 }, (_, index) =>
       makeTicketReadModel({
@@ -791,7 +791,11 @@ describe("board route", () => {
 
     const html = renderToString(<board.BoardView tickets={tickets} />);
 
-    expect(html.match(/class="ticket-card"/g)).toHaveLength(2000);
+    expect(html).toContain("<h2>backlog (500)</h2>");
+    expect(html).toContain("<h2>done (500)</h2>");
+    const renderedCardCount = html.match(/class="ticket-card"/g)?.length ?? 0;
+    expect(renderedCardCount).toBeGreaterThan(0);
+    expect(renderedCardCount).toBeLessThan(2000);
   });
 
   it("redirects unauthenticated requests to login", async () => {

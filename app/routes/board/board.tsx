@@ -5,12 +5,13 @@ import {
   useLoaderData,
   type FetcherWithComponents,
 } from "react-router";
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { match } from "ts-pattern";
 
 import { Button } from "~/components/button";
 import { Dialog } from "~/components/dialog";
 import { ScreenShell } from "~/components/screen-shell";
+import { VirtualizedTicketList } from "~/components/virtualized-ticket-list";
 import { db } from "~/db/client.server";
 import { listEpics, type Epic } from "~/services/epics/epics.server";
 import { requireAuthenticatedUser } from "~/services/session/session.server";
@@ -189,6 +190,9 @@ export function filterTickets(
     return true;
   });
 }
+
+const BOARD_COLUMN_LIST_HEIGHT = 480;
+const TICKET_CARD_ITEM_SIZE = 200;
 
 export function meta() {
   return [{ title: "Kanban Board" }];
@@ -422,12 +426,8 @@ export function BoardView({
             key={column.state}
             onDropTicket={handleTicketDrop}
             state={column.state}
-            ticketCount={column.tickets.length}
-          >
-            {column.tickets.map((ticket) => (
-              <DraggableTicketCard key={ticket.id} ticket={ticket} />
-            ))}
-          </BoardColumnDropZone>
+            tickets={column.tickets}
+          />
         ))}
       </section>
     </ScreenShell>
@@ -435,15 +435,13 @@ export function BoardView({
 }
 
 function BoardColumnDropZone({
-  children,
   onDropTicket,
   state,
-  ticketCount,
+  tickets,
 }: {
-  children: ReactNode;
   onDropTicket: (event: DragEvent<HTMLElement>, state: TicketState) => void;
   state: TicketState;
-  ticketCount: number;
+  tickets: TicketReadModel[];
 }) {
   return (
     <article
@@ -451,8 +449,13 @@ function BoardColumnDropZone({
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => onDropTicket(event, state)}
     >
-      <h2>{`${state} (${ticketCount})`}</h2>
-      {children}
+      <h2>{`${state} (${tickets.length})`}</h2>
+      <VirtualizedTicketList
+        height={BOARD_COLUMN_LIST_HEIGHT}
+        itemSize={TICKET_CARD_ITEM_SIZE}
+        items={tickets}
+        renderItem={(ticket) => <DraggableTicketCard ticket={ticket} />}
+      />
     </article>
   );
 }
