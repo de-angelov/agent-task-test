@@ -23,6 +23,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.6.3",
+    "react-window": "^1.8.11",
     "remeda": "^2.24.0",
     "ts-pattern": "^5.7.1"
   },
@@ -33,6 +34,7 @@
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/react-window": "^1.8.8",
     "drizzle-kit": "^0.31.4",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3",
